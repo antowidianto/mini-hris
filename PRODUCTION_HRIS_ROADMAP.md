@@ -36,8 +36,8 @@ Objective:
 - [x] 2. Multi-Company Support
 - [x] 3. Document Management And Generator
 - [x] 4. Notification And Reminder System
-- [ ] 5. Import And Export
-- [ ] 6. Flexible Approval Workflow
+- [x] 5. Import And Export
+- [x] 6. Flexible Approval Workflow
 - [ ] 7. Reporting System
 - [ ] 8. Corporate UI Improvement
 - [ ] 9. Audit Log Improvement

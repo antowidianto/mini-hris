@@ -13,6 +13,7 @@ import EmployeeDetailView from '@/views/employees/EmployeeDetailView.vue'
 import EmployeeFormView from '@/views/employees/EmployeeFormView.vue'
 import EmployeeListView from '@/views/employees/EmployeeListView.vue'
 import ForbiddenView from '@/views/ForbiddenView.vue'
+import ImportExportView from '@/views/import-export/ImportExportView.vue'
 import CompanySettingsView from '@/views/settings/CompanySettingsView.vue'
 import LeaveApprovalView from '@/views/leaves/LeaveApprovalView.vue'
 import LeaveRequestView from '@/views/leaves/LeaveRequestView.vue'
@@ -190,6 +191,16 @@ const routes = [
           requiresAuth: true,
           label: 'Payslip Detail',
           roles: routeAccess.payslips,
+        },
+      },
+      {
+        path: 'import-export',
+        name: 'import-export',
+        component: ImportExportView,
+        meta: {
+          requiresAuth: true,
+          label: 'Import & Export',
+          roles: routeAccess.importExport,
         },
       },
       {

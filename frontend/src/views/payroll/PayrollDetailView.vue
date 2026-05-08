@@ -162,6 +162,18 @@ onMounted(loadPayroll)
             <dd class="mt-1 font-medium">{{ payroll.generated_at ?? '--' }}</dd>
           </div>
           <div>
+            <dt class="text-xs uppercase text-hris-muted">Approval Status</dt>
+            <dd class="mt-1 font-medium">{{ payroll.approval_status ?? '--' }}</dd>
+          </div>
+          <div v-if="payroll.current_approval_step">
+            <dt class="text-xs uppercase text-hris-muted">Current Approval</dt>
+            <dd class="mt-1 font-medium">Step {{ payroll.current_approval_step.step_order }} - {{ payroll.current_approval_step.role }}</dd>
+          </div>
+          <div v-for="step in payroll.approval_steps" :key="step.id">
+            <dt class="text-xs uppercase text-hris-muted">Approval Step {{ step.step_order }}</dt>
+            <dd class="mt-1 font-medium">{{ step.role }} - {{ step.status }}</dd>
+          </div>
+          <div>
             <dt class="text-xs uppercase text-hris-muted">Work Days Setting</dt>
             <dd class="mt-1 font-medium">{{ payroll.settings_snapshot?.payroll_work_days_per_month ?? '--' }}</dd>
           </div>

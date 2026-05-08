@@ -68,6 +68,10 @@ function statusClass(status) {
 }
 
 function workflowLabel(leaveRequest) {
+  if (leaveRequest.current_approval_step) {
+    return `Waiting ${leaveRequest.current_approval_step.role}`
+  }
+
   if (leaveRequest.status === 'rejected' && leaveRequest.supervisor_status === 'rejected') {
     return 'Rejected by Supervisor'
   }
@@ -292,8 +296,15 @@ onMounted(async () => {
               </td>
               <td class="px-4 py-3">
                 <p class="text-sm font-medium">{{ workflowLabel(leaveRequest) }}</p>
-                <p class="text-xs text-hris-muted">Supervisor: {{ leaveRequest.supervisor_status }}</p>
-                <p class="text-xs text-hris-muted">HR: {{ leaveRequest.hr_status }}</p>
+                <template v-if="leaveRequest.approval_steps?.length">
+                  <p v-for="step in leaveRequest.approval_steps" :key="step.id" class="text-xs text-hris-muted">
+                    Step {{ step.step_order }}: {{ step.role }} - {{ step.status }}
+                  </p>
+                </template>
+                <template v-else>
+                  <p class="text-xs text-hris-muted">Supervisor: {{ leaveRequest.supervisor_status }}</p>
+                  <p class="text-xs text-hris-muted">HR: {{ leaveRequest.hr_status }}</p>
+                </template>
               </td>
               <td class="px-4 py-3">
                 <textarea

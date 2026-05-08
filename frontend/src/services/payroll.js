@@ -18,6 +18,18 @@ export async function getPayroll(id) {
   return response.data.data.payroll
 }
 
+export async function approvePayroll(id, payload = {}) {
+  const response = await api.post(`/payroll/${id}/approve`, payload)
+
+  return response.data.data.payroll
+}
+
+export async function rejectPayroll(id, payload = {}) {
+  const response = await api.post(`/payroll/${id}/reject`, payload)
+
+  return response.data.data.payroll
+}
+
 export async function getPayslips(params = {}) {
   const response = await api.get('/payslips', { params })
 

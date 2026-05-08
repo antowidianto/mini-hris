@@ -2,8 +2,9 @@
 import { onMounted, reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
+import ConfirmationModal from '@/components/ConfirmationModal.vue'
 import { getEmployees } from '@/services/employees'
-import { generatePayroll, getPayrolls } from '@/services/payroll'
+import { approvePayroll, generatePayroll, getPayrolls, rejectPayroll } from '@/services/payroll'
 
 const currentDate = new Date()
 
@@ -11,6 +12,7 @@ const filters = reactive({
   period_year: currentDate.getFullYear(),
   period_month: currentDate.getMonth() + 1,
   employee_id: '',
+  approval_status: '',
   per_page: 10,
   page: 1,
 })
@@ -32,6 +34,9 @@ const employees = ref([])
 const meta = ref(null)
 const loading = ref(false)
 const generating = ref(false)
+const deciding = ref(false)
+const decision = ref(null)
+const notes = reactive({})
 const error = ref(null)
 const success = ref(null)
 
@@ -48,6 +53,24 @@ function requestError(requestError, fallback) {
   const firstError = errors ? Object.values(errors)[0]?.[0] : null
 
   return firstError ?? requestError.response?.data?.message ?? fallback
+}
+
+function statusClass(status) {
+  return {
+    pending: 'bg-amber-50 text-amber-700',
+    approved: 'bg-emerald-50 text-emerald-700',
+    rejected: 'bg-red-50 text-red-700',
+  }[status] ?? 'bg-slate-100 text-slate-600'
+}
+
+function workflowLabel(payroll) {
+  if (payroll.approval_status !== 'pending') {
+    return payroll.approval_status
+  }
+
+  return payroll.current_approval_step
+    ? `Waiting ${payroll.current_approval_step.role}`
+    : 'No approval step'
 }
 
 async function loadLookups() {
@@ -107,8 +130,46 @@ function resetFilters() {
   filters.period_year = currentDate.getFullYear()
   filters.period_month = currentDate.getMonth() + 1
   filters.employee_id = ''
+  filters.approval_status = ''
   filters.per_page = 10
   loadPayrolls(1)
+}
+
+function requestDecision(payroll, action) {
+  decision.value = { payroll, action }
+}
+
+async function confirmDecision() {
+  if (!decision.value) {
+    return
+  }
+
+  deciding.value = true
+  error.value = null
+  success.value = null
+
+  const payroll = decision.value.payroll
+  const payload = {
+    approval_notes: notes[payroll.id] ?? '',
+  }
+
+  try {
+    if (decision.value.action === 'approve') {
+      await approvePayroll(payroll.id, payload)
+      success.value = 'Payroll approved.'
+    } else {
+      await rejectPayroll(payroll.id, payload)
+      success.value = 'Payroll rejected.'
+    }
+
+    notes[payroll.id] = ''
+    decision.value = null
+    await loadPayrolls(meta.value?.current_page ?? 1)
+  } catch (decisionError) {
+    error.value = requestError(decisionError, 'Unable to update payroll approval')
+  } finally {
+    deciding.value = false
+  }
 }
 
 onMounted(async () => {
@@ -155,7 +216,7 @@ onMounted(async () => {
       </button>
     </form>
 
-    <form class="mt-5 grid gap-3 rounded-md border border-hris-border bg-hris-panel p-4 sm:grid-cols-5" @submit.prevent="loadPayrolls(1)">
+    <form class="mt-5 grid gap-3 rounded-md border border-hris-border bg-hris-panel p-4 sm:grid-cols-6" @submit.prevent="loadPayrolls(1)">
       <input v-model.number="filters.period_year" type="number" min="2020" max="2100" class="rounded-md border border-hris-border px-3 py-2 text-sm" aria-label="Filter year" />
       <input v-model.number="filters.period_month" type="number" min="1" max="12" class="rounded-md border border-hris-border px-3 py-2 text-sm" aria-label="Filter month" />
       <select v-model="filters.employee_id" class="rounded-md border border-hris-border px-3 py-2 text-sm">
@@ -163,6 +224,12 @@ onMounted(async () => {
         <option v-for="employee in employees" :key="employee.id" :value="employee.id">
           {{ employee.full_name }}
         </option>
+      </select>
+      <select v-model="filters.approval_status" class="rounded-md border border-hris-border px-3 py-2 text-sm">
+        <option value="">All statuses</option>
+        <option value="pending">Pending approval</option>
+        <option value="approved">Approved</option>
+        <option value="rejected">Rejected</option>
       </select>
       <button type="submit" class="rounded-md bg-hris-primary px-4 py-2 text-sm font-semibold text-white hover:bg-hris-primary-dark">
         Apply
@@ -184,6 +251,8 @@ onMounted(async () => {
               <th class="px-4 py-3 font-semibold">Gross</th>
               <th class="px-4 py-3 font-semibold">Deductions</th>
               <th class="px-4 py-3 font-semibold">THP</th>
+              <th class="px-4 py-3 font-semibold">Approval</th>
+              <th class="px-4 py-3 font-semibold">Notes</th>
               <th class="px-4 py-3 font-semibold">Actions</th>
             </tr>
           </thead>
@@ -198,9 +267,34 @@ onMounted(async () => {
               <td class="px-4 py-3">{{ currency(payroll.total_deductions) }}</td>
               <td class="px-4 py-3 font-semibold">{{ currency(payroll.take_home_pay ?? payroll.net_salary) }}</td>
               <td class="px-4 py-3">
-                <RouterLink class="text-hris-primary hover:underline" :to="`/payroll/${payroll.id}`">
-                  View
-                </RouterLink>
+                <span class="rounded-md px-2 py-1 text-xs font-semibold" :class="statusClass(payroll.approval_status)">
+                  {{ workflowLabel(payroll) }}
+                </span>
+              </td>
+              <td class="px-4 py-3">
+                <textarea
+                  v-if="payroll.approval_status === 'pending'"
+                  v-model="notes[payroll.id]"
+                  rows="2"
+                  class="w-48 rounded-md border border-hris-border px-3 py-2 text-sm"
+                  placeholder="Approval notes"
+                ></textarea>
+                <p v-else class="max-w-48 text-xs text-hris-muted">{{ payroll.approval_notes ?? '--' }}</p>
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex flex-wrap gap-2">
+                  <RouterLink class="text-hris-primary hover:underline" :to="`/payroll/${payroll.id}`">
+                    View
+                  </RouterLink>
+                  <template v-if="payroll.approval_status === 'pending'">
+                    <button type="button" class="text-emerald-700 hover:underline" @click="requestDecision(payroll, 'approve')">
+                      Approve
+                    </button>
+                    <button type="button" class="text-red-600 hover:underline" @click="requestDecision(payroll, 'reject')">
+                      Reject
+                    </button>
+                  </template>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -219,5 +313,16 @@ onMounted(async () => {
         </button>
       </div>
     </div>
+
+    <ConfirmationModal
+      :open="Boolean(decision)"
+      :title="decision?.action === 'approve' ? 'Approve Payroll' : 'Reject Payroll'"
+      :message="`${decision?.action === 'approve' ? 'Approve' : 'Reject'} payroll for ${decision?.payroll?.employee?.full_name ?? 'this employee'}?`"
+      :confirm-label="decision?.action === 'approve' ? 'Approve' : 'Reject'"
+      :variant="decision?.action === 'approve' ? 'success' : 'danger'"
+      :loading="deciding"
+      @cancel="decision = null"
+      @confirm="confirmDecision"
+    />
   </section>
 </template>

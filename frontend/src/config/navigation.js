@@ -11,6 +11,7 @@ export const routeAccess = {
   leaveApprovals: [ROLES.ADMIN, ROLES.HR, ROLES.EMPLOYEE],
   payroll: ADMIN_HR_ROLES,
   payslips: [ROLES.EMPLOYEE],
+  importExport: ADMIN_HR_ROLES,
   companySettings: [ROLES.ADMIN],
   notifications: [],
   auditLogs: [ROLES.ADMIN],
@@ -57,6 +58,7 @@ export const navigationGroups = [
   {
     label: 'System',
     items: [
+      { label: 'Import & Export', to: '/import-export', access: routeAccess.importExport },
       { label: 'Notifications', to: '/notifications', access: routeAccess.notifications },
       { label: 'Company Settings', to: '/company-settings', access: routeAccess.companySettings },
       { label: 'Audit Logs', to: '/audit-logs', access: routeAccess.auditLogs },
