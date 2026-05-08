@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Leaves;
 
+use App\Models\ApprovalFlow;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
@@ -240,6 +241,51 @@ class LeaveManagementTest extends TestCase
         $this->postJson("/api/leaves/{$leaveRequest->id}/approve")
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['supervisor_status'], 'errors');
+    }
+
+    public function test_leave_can_use_one_step_hr_approval_flow(): void
+    {
+        [$employeeUser, $leaveType] = $this->employeeWithSupervisorAndLeaveBalance();
+        $hr = User::factory()->create(['role' => User::ROLE_HR]);
+
+        ApprovalFlow::query()->where('company_id', $hr->company_id)->where('module', ApprovalFlow::MODULE_LEAVE)->update(['is_active' => false]);
+        ApprovalFlow::query()->updateOrCreate(
+            [
+                'company_id' => $hr->company_id,
+                'module' => ApprovalFlow::MODULE_LEAVE,
+                'step_order' => 1,
+                'role' => User::ROLE_HR,
+            ],
+            ['is_active' => true]
+        );
+
+        Sanctum::actingAs($employeeUser);
+
+        $request = $this->postJson('/api/leaves', [
+            'leave_type_id' => $leaveType->id,
+            'start_date' => '2026-05-11',
+            'end_date' => '2026-05-12',
+            'reason' => 'Family event',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.leave_request.supervisor_status', LeaveRequest::DECISION_APPROVED)
+            ->assertJsonPath('data.leave_request.current_approval_step.role', User::ROLE_HR)
+            ->json('data.leave_request');
+
+        Sanctum::actingAs($hr);
+
+        $this->postJson("/api/leaves/{$request['id']}/approve", [
+            'approval_notes' => 'One-step approval.',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.leave_request.status', LeaveRequest::STATUS_APPROVED)
+            ->assertJsonPath('data.leave_request.hr_status', LeaveRequest::DECISION_APPROVED);
+
+        $this->assertDatabaseHas('leave_balances', [
+            'employee_id' => $employeeUser->employee->id,
+            'leave_type_id' => $leaveType->id,
+            'used_days' => 2,
+        ]);
     }
 
     public function test_direct_supervisor_can_reject_leave_without_deducting_balance(): void

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class LeaveRequest extends Model
 {
@@ -99,6 +100,11 @@ class LeaveRequest extends Model
     public function hrApprover(): BelongsTo
     {
         return $this->belongsTo(User::class, 'hr_approved_by');
+    }
+
+    public function approvalSteps(): MorphMany
+    {
+        return $this->morphMany(ApprovalStep::class, 'approvable')->orderBy('step_order');
     }
 
     public function scopeOverlapping(Builder $query, string $startDate, string $endDate): Builder

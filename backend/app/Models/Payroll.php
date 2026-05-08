@@ -8,9 +8,16 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Payroll extends Model
 {
+    public const APPROVAL_PENDING = 'pending';
+
+    public const APPROVAL_APPROVED = 'approved';
+
+    public const APPROVAL_REJECTED = 'rejected';
+
     /** @use HasFactory<PayrollFactory> */
     use HasFactory;
 
@@ -48,6 +55,12 @@ class Payroll extends Model
         'settings_snapshot',
         'generated_by',
         'generated_at',
+        'approval_status',
+        'approval_notes',
+        'approved_by',
+        'approved_at',
+        'rejected_by',
+        'rejected_at',
     ];
 
     protected function casts(): array
@@ -83,6 +96,8 @@ class Payroll extends Model
             'unpaid_leave_days' => 'integer',
             'settings_snapshot' => 'array',
             'generated_at' => 'datetime',
+            'approved_at' => 'datetime',
+            'rejected_at' => 'datetime',
         ];
     }
 
@@ -101,9 +116,24 @@ class Payroll extends Model
         return $this->belongsTo(User::class, 'generated_by');
     }
 
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function rejecter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'rejected_by');
+    }
+
     public function documents(): HasMany
     {
         return $this->hasMany(Document::class);
+    }
+
+    public function approvalSteps(): MorphMany
+    {
+        return $this->morphMany(ApprovalStep::class, 'approvable')->orderBy('step_order');
     }
 
     public function scopeForPeriod(Builder $query, ?int $year, ?int $month): Builder

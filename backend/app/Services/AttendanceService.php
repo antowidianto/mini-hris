@@ -247,4 +247,17 @@ class AttendanceService
 
         return (int) $shiftEnd->diffInMinutes($clockOutTime);
     }
+
+    public function overtimeMinutesForValues(string $attendanceDate, string $timeOut, int $companyId): int
+    {
+        $settings = CompanySetting::query()->firstOrCreate(['company_id' => $companyId], CompanySetting::defaults());
+        $shiftEnd = Carbon::parse($attendanceDate.' '.$settings->default_work_end);
+        $clockOut = Carbon::parse($attendanceDate.' '.$timeOut);
+
+        if ($clockOut->lessThanOrEqualTo($shiftEnd)) {
+            return 0;
+        }
+
+        return (int) $shiftEnd->diffInMinutes($clockOut);
+    }
 }

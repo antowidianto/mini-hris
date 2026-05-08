@@ -20,6 +20,8 @@ class AuditLog extends Model
 
     public const ACTION_GENERATED = 'generated';
 
+    public const ACTION_IMPORTED = 'imported';
+
     public const ACTION_LOGIN = 'login';
 
     public const ACTION_LOGOUT = 'logout';
@@ -31,6 +33,8 @@ class AuditLog extends Model
     public const MODULE_AUTH = 'auth';
 
     public const MODULE_EMPLOYEE = 'employee';
+
+    public const MODULE_IMPORT_EXPORT = 'import_export';
 
     public const MODULE_CONTRACT = 'contract';
 

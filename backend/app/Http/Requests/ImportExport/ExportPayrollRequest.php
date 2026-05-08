@@ -1,12 +1,11 @@
 <?php
 
-namespace App\Http\Requests\Payroll;
+namespace App\Http\Requests\ImportExport;
 
-use App\Models\Payroll;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class ListPayrollRequest extends FormRequest
+class ExportPayrollRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -21,9 +20,7 @@ class ListPayrollRequest extends FormRequest
         return [
             'period_year' => ['nullable', 'integer', 'min:2020', 'max:2100'],
             'period_month' => ['nullable', 'integer', 'min:1', 'max:12'],
-            'employee_id' => ['nullable', 'integer', 'exists:employees,id'],
-            'approval_status' => ['nullable', Rule::in([Payroll::APPROVAL_PENDING, Payroll::APPROVAL_APPROVED, Payroll::APPROVAL_REJECTED])],
-            'per_page' => ['nullable', 'integer', 'min:5', 'max:50'],
+            'employee_id' => ['nullable', 'integer', Rule::exists('employees', 'id')->where('company_id', $this->user()->companyId())],
         ];
     }
 }

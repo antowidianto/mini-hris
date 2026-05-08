@@ -71,6 +71,12 @@ class PayrollFactory extends Factory
             'settings_snapshot' => null,
             'generated_by' => User::factory(),
             'generated_at' => now(),
+            'approval_status' => Payroll::APPROVAL_APPROVED,
+            'approval_notes' => null,
+            'approved_by' => null,
+            'approved_at' => now(),
+            'rejected_by' => null,
+            'rejected_at' => null,
         ];
     }
 }

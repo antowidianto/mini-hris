@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\ApprovalFlow;
+use App\Models\ApprovalStep;
 use App\Models\Attendance;
 use App\Models\AuditLog;
 use App\Models\CompanySetting;
@@ -17,7 +19,10 @@ use Illuminate\Validation\ValidationException;
 
 class PayrollService
 {
-    public function __construct(private readonly AuditLogService $auditLogService) {}
+    public function __construct(
+        private readonly AuditLogService $auditLogService,
+        private readonly ApprovalFlowService $approvalFlowService
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data
@@ -81,10 +86,11 @@ class PayrollService
         $perPage = min((int) ($filters['per_page'] ?? 10), 50);
 
         return Payroll::query()
-            ->with(['employee.department', 'employee.position', 'generator'])
+            ->with($this->payrollRelations())
             ->where('company_id', $actor->companyId())
             ->forPeriod($filters['period_year'] ?? null, $filters['period_month'] ?? null)
             ->when($filters['employee_id'] ?? null, fn ($query, $employeeId) => $query->where('employee_id', $employeeId))
+            ->when($filters['approval_status'] ?? null, fn ($query, $approvalStatus) => $query->where('approval_status', $approvalStatus))
             ->latest('period_year')
             ->latest('period_month')
             ->latest()
@@ -101,8 +107,9 @@ class PayrollService
         $perPage = min((int) ($filters['per_page'] ?? 10), 50);
 
         return Payroll::query()
-            ->with(['employee.department', 'employee.position', 'generator'])
+            ->with($this->payrollRelations())
             ->where('employee_id', $employee->id)
+            ->where('approval_status', Payroll::APPROVAL_APPROVED)
             ->forPeriod($filters['period_year'] ?? null, $filters['period_month'] ?? null)
             ->latest('period_year')
             ->latest('period_month')
@@ -120,7 +127,70 @@ class PayrollService
             ]);
         }
 
-        return $payroll->load(['employee.department', 'employee.position', 'generator']);
+        if ($payroll->approval_status !== Payroll::APPROVAL_APPROVED) {
+            throw ValidationException::withMessages([
+                'payroll' => ['This payslip is not approved yet.'],
+            ]);
+        }
+
+        return $payroll->load($this->payrollRelations());
+    }
+
+    public function approve(Payroll $payroll, User $approver, ?string $notes = null): Payroll
+    {
+        return DB::transaction(function () use ($approver, $notes, $payroll) {
+            $payroll = $this->lockedPayroll($payroll);
+            $this->ensureSameCompany($payroll, $approver);
+            $this->ensurePendingPayroll($payroll);
+            $this->ensureRuntimeStepsExist($payroll);
+
+            $this->approvalFlowService->decideCurrentStep($payroll, $approver, ApprovalStep::STATUS_APPROVED, $notes);
+
+            if (! $this->approvalFlowService->hasPendingSteps($payroll)) {
+                $payroll->update([
+                    'approval_status' => Payroll::APPROVAL_APPROVED,
+                    'approval_notes' => $notes,
+                    'approved_by' => $approver->id,
+                    'approved_at' => now(),
+                ]);
+            }
+
+            $this->auditLogService->record(
+                $approver,
+                AuditLog::ACTION_APPROVED,
+                AuditLog::MODULE_PAYROLL,
+                "Approved payroll #{$payroll->id} for {$payroll->employee->full_name}."
+            );
+
+            return $payroll->refresh()->load($this->payrollRelations());
+        });
+    }
+
+    public function reject(Payroll $payroll, User $approver, ?string $notes = null): Payroll
+    {
+        return DB::transaction(function () use ($approver, $notes, $payroll) {
+            $payroll = $this->lockedPayroll($payroll);
+            $this->ensureSameCompany($payroll, $approver);
+            $this->ensurePendingPayroll($payroll);
+            $this->ensureRuntimeStepsExist($payroll);
+
+            $this->approvalFlowService->decideCurrentStep($payroll, $approver, ApprovalStep::STATUS_REJECTED, $notes);
+            $payroll->update([
+                'approval_status' => Payroll::APPROVAL_REJECTED,
+                'approval_notes' => $notes,
+                'rejected_by' => $approver->id,
+                'rejected_at' => now(),
+            ]);
+
+            $this->auditLogService->record(
+                $approver,
+                AuditLog::ACTION_REJECTED,
+                AuditLog::MODULE_PAYROLL,
+                "Rejected payroll #{$payroll->id} for {$payroll->employee->full_name}."
+            );
+
+            return $payroll->refresh()->load($this->payrollRelations());
+        });
     }
 
     private function createPayroll(
@@ -169,7 +239,7 @@ class PayrollService
         );
         $takeHomePay = round($grossSalary - $totalDeductions, 2);
 
-        return Payroll::query()->create([
+        $payroll = Payroll::query()->create([
             'employee_id' => $employee->id,
             'company_id' => $employee->company_id,
             'period_year' => $year,
@@ -203,7 +273,16 @@ class PayrollService
             'settings_snapshot' => $this->settingsSnapshot($settings),
             'generated_by' => $generator->id,
             'generated_at' => now(),
-        ])->load(['employee.department', 'employee.position', 'generator']);
+            'approval_status' => Payroll::APPROVAL_PENDING,
+        ]);
+
+        $this->approvalFlowService->createRuntimeSteps(
+            $payroll,
+            ApprovalFlow::MODULE_PAYROLL,
+            $employee->company_id
+        );
+
+        return $payroll->load($this->payrollRelations());
     }
 
     /**
@@ -254,6 +333,43 @@ class PayrollService
         return $employee;
     }
 
+    private function ensureRuntimeStepsExist(Payroll $payroll): void
+    {
+        if ($payroll->approvalSteps()->exists()) {
+            return;
+        }
+
+        $this->approvalFlowService->createRuntimeSteps(
+            $payroll,
+            ApprovalFlow::MODULE_PAYROLL,
+            (int) $payroll->company_id
+        );
+    }
+
+    private function ensurePendingPayroll(Payroll $payroll): void
+    {
+        if ($payroll->approval_status !== Payroll::APPROVAL_PENDING) {
+            throw ValidationException::withMessages([
+                'approval_status' => ['Only pending payroll records can be decided.'],
+            ]);
+        }
+    }
+
+    private function lockedPayroll(Payroll $payroll): Payroll
+    {
+        return Payroll::query()
+            ->whereKey($payroll->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+    }
+
+    private function ensureSameCompany(Payroll $payroll, User $user): void
+    {
+        if ((int) $payroll->company_id !== $user->companyId()) {
+            abort(404);
+        }
+    }
+
     private function componentAmount(array $data, string $key, mixed $default): float
     {
         return round((float) ($data[$key] ?? $default ?? 0), 2);
@@ -262,6 +378,21 @@ class PayrollService
     private function rateAmount(float $amount, mixed $rate): float
     {
         return round($amount * ((float) $rate / 100), 2);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function payrollRelations(): array
+    {
+        return [
+            'employee.department',
+            'employee.position',
+            'generator',
+            'approver',
+            'rejecter',
+            'approvalSteps.approver',
+        ];
     }
 
     /**

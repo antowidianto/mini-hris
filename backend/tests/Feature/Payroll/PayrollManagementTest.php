@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Payroll;
 
+use App\Models\ApprovalFlow;
 use App\Models\Attendance;
 use App\Models\CompanySetting;
 use App\Models\Department;
@@ -184,6 +185,72 @@ class PayrollManagementTest extends TestCase
         $this->getJson("/api/payslips/{$otherPayroll->id}")
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['payroll'], 'errors');
+    }
+
+    public function test_payroll_uses_configured_multi_step_approval_flow(): void
+    {
+        $hr = User::factory()->create(['role' => User::ROLE_HR]);
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $employee = $this->employeeWithUser();
+
+        ApprovalFlow::query()->where('company_id', $hr->company_id)->where('module', ApprovalFlow::MODULE_PAYROLL)->delete();
+        ApprovalFlow::query()->create([
+            'company_id' => $hr->company_id,
+            'module' => ApprovalFlow::MODULE_PAYROLL,
+            'step_order' => 1,
+            'role' => User::ROLE_HR,
+            'is_active' => true,
+        ]);
+        ApprovalFlow::query()->create([
+            'company_id' => $hr->company_id,
+            'module' => ApprovalFlow::MODULE_PAYROLL,
+            'step_order' => 2,
+            'role' => User::ROLE_ADMIN,
+            'is_active' => true,
+        ]);
+
+        Sanctum::actingAs($hr);
+
+        $payroll = $this->postJson('/api/payroll/generate', [
+            'period_year' => 2026,
+            'period_month' => 5,
+            'employee_id' => $employee->id,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.payrolls.0.approval_status', Payroll::APPROVAL_PENDING)
+            ->assertJsonPath('data.payrolls.0.current_approval_step.role', User::ROLE_HR)
+            ->json('data.payrolls.0');
+
+        Sanctum::actingAs($employee->user);
+
+        $this->getJson('/api/payslips')
+            ->assertOk()
+            ->assertJsonCount(0, 'data.payrolls');
+
+        Sanctum::actingAs($hr);
+
+        $this->postJson("/api/payroll/{$payroll['id']}/approve", [
+            'approval_notes' => 'HR checked payroll.',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.payroll.approval_status', Payroll::APPROVAL_PENDING)
+            ->assertJsonPath('data.payroll.current_approval_step.role', User::ROLE_ADMIN);
+
+        Sanctum::actingAs($admin);
+
+        $this->postJson("/api/payroll/{$payroll['id']}/approve", [
+            'approval_notes' => 'Ready for release.',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.payroll.approval_status', Payroll::APPROVAL_APPROVED)
+            ->assertJsonPath('data.payroll.approver.email', $admin->email);
+
+        Sanctum::actingAs($employee->user);
+
+        $this->getJson('/api/payslips')
+            ->assertOk()
+            ->assertJsonCount(1, 'data.payrolls')
+            ->assertJsonPath('data.payrolls.0.id', $payroll['id']);
     }
 
     public function test_roles_are_restricted_for_payroll_endpoints(): void

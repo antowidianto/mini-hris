@@ -27,6 +27,10 @@ class LeaveRequestResource extends JsonResource
             'hr_approved_at' => $this->hr_approved_at?->toISOString(),
             'approval_notes' => $this->approval_notes,
             'approved_at' => $this->approved_at?->toISOString(),
+            'approval_steps' => ApprovalStepResource::collection($this->whenLoaded('approvalSteps')),
+            'current_approval_step' => new ApprovalStepResource($this->whenLoaded('approvalSteps', function () {
+                return $this->approvalSteps->firstWhere('status', 'pending');
+            })),
             'employee' => new EmployeeResource($this->whenLoaded('employee')),
             'leave_type' => new LeaveTypeResource($this->whenLoaded('leaveType')),
             'supervisor_approver' => new AuthUserResource($this->whenLoaded('supervisorApprover')),

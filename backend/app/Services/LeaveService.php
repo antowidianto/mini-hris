@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\ApprovalFlow;
+use App\Models\ApprovalStep;
 use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
@@ -16,7 +18,10 @@ use Illuminate\Validation\ValidationException;
 
 class LeaveService
 {
-    public function __construct(private readonly AuditLogService $auditLogService) {}
+    public function __construct(
+        private readonly AuditLogService $auditLogService,
+        private readonly ApprovalFlowService $approvalFlowService
+    ) {}
 
     /**
      * @return Collection<int, LeaveType>
@@ -102,7 +107,7 @@ class LeaveService
                 ]);
             }
 
-            return LeaveRequest::query()->create([
+            $leaveRequest = LeaveRequest::query()->create([
                 'company_id' => $employee->company_id,
                 'employee_id' => $employee->id,
                 'leave_type_id' => $balance->leave_type_id,
@@ -115,7 +120,18 @@ class LeaveService
                     ? LeaveRequest::DECISION_PENDING
                     : LeaveRequest::DECISION_APPROVED,
                 'hr_status' => LeaveRequest::DECISION_PENDING,
-            ])->load($this->leaveRequestRelations());
+            ]);
+
+            $this->approvalFlowService->createRuntimeSteps(
+                $leaveRequest,
+                ApprovalFlow::MODULE_LEAVE,
+                $employee->company_id,
+                $employee
+            );
+
+            $this->syncLeaveApprovalState($leaveRequest);
+
+            return $leaveRequest->refresh()->load($this->leaveRequestRelations());
         });
     }
 
@@ -130,15 +146,17 @@ class LeaveService
         return LeaveRequest::query()
             ->with($this->leaveRequestRelations())
             ->where('company_id', $actor->companyId())
+            ->whereHas('approvalSteps', fn ($query) => $query
+                ->where('status', ApprovalStep::STATUS_PENDING)
+                ->whereIn('role', $this->approvalRolesFor($actor))
+                ->whereRaw('step_order = (
+                    select min(inner_steps.step_order)
+                    from approval_steps as inner_steps
+                    where inner_steps.approvable_type = approval_steps.approvable_type
+                    and inner_steps.approvable_id = approval_steps.approvable_id
+                    and inner_steps.status = ?
+                )', [ApprovalStep::STATUS_PENDING]))
             ->when($status, fn ($query) => $query->where('status', $status))
-            ->when(
-                $status === LeaveRequest::STATUS_PENDING && ! isset($filters['supervisor_status']),
-                fn ($query) => $query->where('supervisor_status', LeaveRequest::DECISION_APPROVED)
-            )
-            ->when(
-                $status === LeaveRequest::STATUS_PENDING && ! isset($filters['hr_status']),
-                fn ($query) => $query->where('hr_status', LeaveRequest::DECISION_PENDING)
-            )
             ->when($filters['supervisor_status'] ?? null, fn ($query, $supervisorStatus) => $query->where('supervisor_status', $supervisorStatus))
             ->when($filters['hr_status'] ?? null, fn ($query, $hrStatus) => $query->where('hr_status', $hrStatus))
             ->when($filters['employee_id'] ?? null, fn ($query, $employeeId) => $query->where('employee_id', $employeeId))
@@ -163,6 +181,16 @@ class LeaveService
             ->with($this->leaveRequestRelations())
             ->where('company_id', $supervisor->company_id)
             ->whereIn('employee_id', $directReportIds)
+            ->whereHas('approvalSteps', fn ($query) => $query
+                ->where('status', ApprovalStep::STATUS_PENDING)
+                ->where('role', 'supervisor')
+                ->whereRaw('step_order = (
+                    select min(inner_steps.step_order)
+                    from approval_steps as inner_steps
+                    where inner_steps.approvable_type = approval_steps.approvable_type
+                    and inner_steps.approvable_id = approval_steps.approvable_id
+                    and inner_steps.status = ?
+                )', [ApprovalStep::STATUS_PENDING]))
             ->when($status, fn ($query) => $query->where('status', $status))
             ->when($supervisorStatus, fn ($query) => $query->where('supervisor_status', $supervisorStatus))
             ->when($filters['hr_status'] ?? null, fn ($query, $hrStatus) => $query->where('hr_status', $hrStatus))
@@ -179,15 +207,12 @@ class LeaveService
             $leaveRequest = $this->lockedLeaveRequest($leaveRequest);
             $this->ensureSameCompany($leaveRequest, $supervisorUser);
             $this->ensurePending($leaveRequest);
-            $this->ensureSupervisorPending($leaveRequest);
             $this->ensureDirectSupervisor($leaveRequest, $supervisorUser);
+            $step = $this->ensureCurrentStep($leaveRequest, 'supervisor');
 
-            $leaveRequest->update([
-                'supervisor_status' => LeaveRequest::DECISION_APPROVED,
-                'supervisor_notes' => $notes,
-                'supervisor_approved_by' => $supervisorUser->id,
-                'supervisor_approved_at' => now(),
-            ]);
+            $step = $this->approvalFlowService->decideStep($step, $supervisorUser, ApprovalStep::STATUS_APPROVED, $notes);
+            $this->completeLeaveApprovalIfReady($leaveRequest, $supervisorUser, $notes);
+            $this->syncLeaveApprovalState($leaveRequest, $step, $notes);
 
             $this->auditLogService->record(
                 $supervisorUser,
@@ -206,20 +231,11 @@ class LeaveService
             $leaveRequest = $this->lockedLeaveRequest($leaveRequest);
             $this->ensureSameCompany($leaveRequest, $supervisorUser);
             $this->ensurePending($leaveRequest);
-            $this->ensureSupervisorPending($leaveRequest);
             $this->ensureDirectSupervisor($leaveRequest, $supervisorUser);
+            $step = $this->ensureCurrentStep($leaveRequest, 'supervisor');
 
-            $leaveRequest->update([
-                'status' => LeaveRequest::STATUS_REJECTED,
-                'supervisor_status' => LeaveRequest::DECISION_REJECTED,
-                'supervisor_notes' => $notes,
-                'supervisor_approved_by' => $supervisorUser->id,
-                'supervisor_approved_at' => now(),
-                'hr_status' => LeaveRequest::DECISION_REJECTED,
-                'approval_notes' => $notes,
-                'approved_by' => $supervisorUser->id,
-                'approved_at' => now(),
-            ]);
+            $step = $this->approvalFlowService->decideStep($step, $supervisorUser, ApprovalStep::STATUS_REJECTED, $notes);
+            $this->rejectLeaveApproval($leaveRequest, $supervisorUser, $step, $notes);
 
             $this->auditLogService->record(
                 $supervisorUser,
@@ -239,35 +255,11 @@ class LeaveService
             $this->ensureSameCompany($leaveRequest, $approver);
 
             $this->ensurePending($leaveRequest);
-            $this->ensureSupervisorApproved($leaveRequest);
-            $this->ensureHrPending($leaveRequest);
+            $step = $this->ensureCurrentManagementStep($leaveRequest);
 
-            $balance = $this->lockedBalance($leaveRequest->employee, $leaveRequest->leaveType, $leaveRequest->start_date->year);
-            $availableDays = $this->availableDays(
-                $leaveRequest->employee,
-                $leaveRequest->leaveType,
-                $leaveRequest->start_date->year,
-                $leaveRequest->id
-            );
-
-            if ($leaveRequest->total_days > $availableDays) {
-                throw ValidationException::withMessages([
-                    'leave_type_id' => ["Insufficient leave balance. Available days: {$availableDays}."],
-                ]);
-            }
-
-            $balance->increment('used_days', $leaveRequest->total_days);
-
-            $leaveRequest->update([
-                'status' => LeaveRequest::STATUS_APPROVED,
-                'hr_status' => LeaveRequest::DECISION_APPROVED,
-                'hr_notes' => $notes,
-                'hr_approved_by' => $approver->id,
-                'hr_approved_at' => now(),
-                'approval_notes' => $notes,
-                'approved_by' => $approver->id,
-                'approved_at' => now(),
-            ]);
+            $step = $this->approvalFlowService->decideCurrentStep($leaveRequest, $approver, ApprovalStep::STATUS_APPROVED, $notes);
+            $this->completeLeaveApprovalIfReady($leaveRequest, $approver, $notes);
+            $this->syncLeaveApprovalState($leaveRequest, $step, $notes);
             $this->auditLogService->record(
                 $approver,
                 AuditLog::ACTION_APPROVED,
@@ -286,19 +278,10 @@ class LeaveService
             $this->ensureSameCompany($leaveRequest, $approver);
 
             $this->ensurePending($leaveRequest);
-            $this->ensureSupervisorApproved($leaveRequest);
-            $this->ensureHrPending($leaveRequest);
+            $step = $this->ensureCurrentManagementStep($leaveRequest);
 
-            $leaveRequest->update([
-                'status' => LeaveRequest::STATUS_REJECTED,
-                'hr_status' => LeaveRequest::DECISION_REJECTED,
-                'hr_notes' => $notes,
-                'hr_approved_by' => $approver->id,
-                'hr_approved_at' => now(),
-                'approval_notes' => $notes,
-                'approved_by' => $approver->id,
-                'approved_at' => now(),
-            ]);
+            $step = $this->approvalFlowService->decideCurrentStep($leaveRequest, $approver, ApprovalStep::STATUS_REJECTED, $notes);
+            $this->rejectLeaveApproval($leaveRequest, $approver, $step, $notes);
             $this->auditLogService->record(
                 $approver,
                 AuditLog::ACTION_REJECTED,
@@ -348,31 +331,148 @@ class LeaveService
         }
     }
 
-    private function ensureSupervisorPending(LeaveRequest $leaveRequest): void
+    /**
+     * @return list<string>
+     */
+    private function approvalRolesFor(User $actor): array
     {
-        if ($leaveRequest->supervisor_status !== LeaveRequest::DECISION_PENDING) {
+        if ($actor->role === User::ROLE_ADMIN) {
+            return [User::ROLE_ADMIN, User::ROLE_HR];
+        }
+
+        return [$actor->role];
+    }
+
+    private function ensureRuntimeStepsExist(LeaveRequest $leaveRequest): void
+    {
+        if ($leaveRequest->approvalSteps()->exists()) {
+            return;
+        }
+
+        $this->approvalFlowService->createRuntimeSteps(
+            $leaveRequest,
+            ApprovalFlow::MODULE_LEAVE,
+            (int) $leaveRequest->company_id,
+            $leaveRequest->employee
+        );
+
+        $this->syncLeaveApprovalState($leaveRequest);
+    }
+
+    private function ensureCurrentStep(LeaveRequest $leaveRequest, string $role): ApprovalStep
+    {
+        $this->ensureRuntimeStepsExist($leaveRequest);
+        $step = $this->approvalFlowService->currentPendingStep($leaveRequest);
+
+        if (! $step || $step->role !== $role) {
             throw ValidationException::withMessages([
                 'supervisor_status' => ['Only leave requests pending supervisor approval can be decided by a supervisor.'],
             ]);
         }
+
+        return $step;
     }
 
-    private function ensureSupervisorApproved(LeaveRequest $leaveRequest): void
+    private function ensureCurrentManagementStep(LeaveRequest $leaveRequest): ApprovalStep
     {
-        if ($leaveRequest->supervisor_status !== LeaveRequest::DECISION_APPROVED) {
+        $this->ensureRuntimeStepsExist($leaveRequest);
+        $step = $this->approvalFlowService->currentPendingStep($leaveRequest);
+
+        if (! $step) {
             throw ValidationException::withMessages([
-                'supervisor_status' => ['Supervisor approval is required before HR decision.'],
+                'hr_status' => ['There is no pending management approval step for this leave request.'],
             ]);
         }
+
+        if ($step->role === 'supervisor') {
+            throw ValidationException::withMessages([
+                'supervisor_status' => ['Supervisor approval is required before management decision.'],
+            ]);
+        }
+
+        return $step;
     }
 
-    private function ensureHrPending(LeaveRequest $leaveRequest): void
+    private function completeLeaveApprovalIfReady(LeaveRequest $leaveRequest, User $approver, ?string $notes): void
     {
-        if ($leaveRequest->hr_status !== LeaveRequest::DECISION_PENDING) {
+        if ($this->approvalFlowService->hasPendingSteps($leaveRequest)) {
+            return;
+        }
+
+        $balance = $this->lockedBalance($leaveRequest->employee, $leaveRequest->leaveType, $leaveRequest->start_date->year);
+        $availableDays = $this->availableDays(
+            $leaveRequest->employee,
+            $leaveRequest->leaveType,
+            $leaveRequest->start_date->year,
+            $leaveRequest->id
+        );
+
+        if ($leaveRequest->total_days > $availableDays) {
             throw ValidationException::withMessages([
-                'hr_status' => ['Only leave requests pending HR approval can be decided by HR.'],
+                'leave_type_id' => ["Insufficient leave balance. Available days: {$availableDays}."],
             ]);
         }
+
+        $balance->increment('used_days', $leaveRequest->total_days);
+
+        $leaveRequest->update([
+            'status' => LeaveRequest::STATUS_APPROVED,
+            'approval_notes' => $notes,
+            'approved_by' => $approver->id,
+            'approved_at' => now(),
+        ]);
+    }
+
+    private function rejectLeaveApproval(LeaveRequest $leaveRequest, User $approver, ApprovalStep $step, ?string $notes): void
+    {
+        $this->syncLeaveApprovalState($leaveRequest, $step, $notes);
+
+        $leaveRequest->update([
+            'status' => LeaveRequest::STATUS_REJECTED,
+            'approval_notes' => $notes,
+            'approved_by' => $approver->id,
+            'approved_at' => now(),
+        ]);
+    }
+
+    private function syncLeaveApprovalState(LeaveRequest $leaveRequest, ?ApprovalStep $decidedStep = null, ?string $notes = null): void
+    {
+        $steps = $leaveRequest->approvalSteps()->with('approver')->orderBy('step_order')->get();
+
+        if ($steps->isEmpty()) {
+            return;
+        }
+
+        $supervisorStep = $steps->firstWhere('role', 'supervisor');
+        $managementSteps = $steps->reject(fn (ApprovalStep $step) => $step->role === 'supervisor');
+        $managementStatus = LeaveRequest::DECISION_APPROVED;
+
+        if ($steps->contains('status', ApprovalStep::STATUS_REJECTED)) {
+            $managementStatus = LeaveRequest::DECISION_REJECTED;
+        } elseif ($managementSteps->contains('status', ApprovalStep::STATUS_PENDING)) {
+            $managementStatus = LeaveRequest::DECISION_PENDING;
+        }
+
+        $updates = [
+            'supervisor_status' => $supervisorStep?->status ?? LeaveRequest::DECISION_APPROVED,
+            'hr_status' => $managementStatus,
+        ];
+
+        if ($decidedStep?->role === 'supervisor') {
+            $updates += [
+                'supervisor_notes' => $notes,
+                'supervisor_approved_by' => $decidedStep->approved_by,
+                'supervisor_approved_at' => $decidedStep->approved_at,
+            ];
+        } elseif ($decidedStep) {
+            $updates += [
+                'hr_notes' => $notes,
+                'hr_approved_by' => $decidedStep->approved_by,
+                'hr_approved_at' => $decidedStep->approved_at,
+            ];
+        }
+
+        $leaveRequest->update($updates);
     }
 
     private function ensureDirectSupervisor(LeaveRequest $leaveRequest, User $supervisorUser): void
@@ -472,6 +572,7 @@ class LeaveService
             'supervisorApprover',
             'hrApprover',
             'approver',
+            'approvalSteps.approver',
         ];
     }
 

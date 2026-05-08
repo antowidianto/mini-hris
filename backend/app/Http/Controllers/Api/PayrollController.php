@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Payroll\GeneratePayrollRequest;
 use App\Http\Requests\Payroll\ListPayrollRequest;
 use App\Http\Requests\Payroll\ListPayslipsRequest;
+use App\Http\Requests\Payroll\PayrollDecisionRequest;
 use App\Http\Resources\PayrollResource;
 use App\Models\Payroll;
 use App\Services\PayrollService;
@@ -40,9 +41,35 @@ class PayrollController extends Controller
     public function show(Payroll $payroll): JsonResponse
     {
         abort_unless((int) $payroll->company_id === request()->user()->companyId(), 404);
-        $payroll->load(['employee.department', 'employee.position', 'generator']);
+        $payroll->load(['employee.department', 'employee.position', 'generator', 'approver', 'rejecter', 'approvalSteps.approver']);
 
         return ApiResponse::success('Payroll record retrieved', [
+            'payroll' => new PayrollResource($payroll),
+        ]);
+    }
+
+    public function approve(PayrollDecisionRequest $request, Payroll $payroll): JsonResponse
+    {
+        $payroll = $this->payrollService->approve(
+            $payroll,
+            $request->user(),
+            $request->validated('approval_notes')
+        );
+
+        return ApiResponse::success('Payroll approved successfully', [
+            'payroll' => new PayrollResource($payroll),
+        ]);
+    }
+
+    public function reject(PayrollDecisionRequest $request, Payroll $payroll): JsonResponse
+    {
+        $payroll = $this->payrollService->reject(
+            $payroll,
+            $request->user(),
+            $request->validated('approval_notes')
+        );
+
+        return ApiResponse::success('Payroll rejected successfully', [
             'payroll' => new PayrollResource($payroll),
         ]);
     }

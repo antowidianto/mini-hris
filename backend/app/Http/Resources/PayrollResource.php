@@ -66,8 +66,18 @@ class PayrollResource extends JsonResource
             'unpaid_leave_days' => $this->unpaid_leave_days,
             'settings_snapshot' => $this->settings_snapshot,
             'generated_at' => $this->generated_at?->toISOString(),
+            'approval_status' => $this->approval_status,
+            'approval_notes' => $this->approval_notes,
+            'approved_at' => $this->approved_at?->toISOString(),
+            'rejected_at' => $this->rejected_at?->toISOString(),
+            'approval_steps' => ApprovalStepResource::collection($this->whenLoaded('approvalSteps')),
+            'current_approval_step' => new ApprovalStepResource($this->whenLoaded('approvalSteps', function () {
+                return $this->approvalSteps->firstWhere('status', 'pending');
+            })),
             'employee' => new EmployeeResource($this->whenLoaded('employee')),
             'generator' => new AuthUserResource($this->whenLoaded('generator')),
+            'approver' => new AuthUserResource($this->whenLoaded('approver')),
+            'rejecter' => new AuthUserResource($this->whenLoaded('rejecter')),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];
