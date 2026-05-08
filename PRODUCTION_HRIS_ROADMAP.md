@@ -38,8 +38,8 @@ Objective:
 - [x] 4. Notification And Reminder System
 - [x] 5. Import And Export
 - [x] 6. Flexible Approval Workflow
-- [ ] 7. Reporting System
-- [ ] 8. Corporate UI Improvement
+- [x] 7. Reporting System
+- [x] 8. Corporate UI Improvement
 - [ ] 9. Audit Log Improvement
 - [ ] 10. Performance Optimization
 

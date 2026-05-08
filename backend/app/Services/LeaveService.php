@@ -146,16 +146,21 @@ class LeaveService
         return LeaveRequest::query()
             ->with($this->leaveRequestRelations())
             ->where('company_id', $actor->companyId())
-            ->whereHas('approvalSteps', fn ($query) => $query
-                ->where('status', ApprovalStep::STATUS_PENDING)
-                ->whereIn('role', $this->approvalRolesFor($actor))
-                ->whereRaw('step_order = (
-                    select min(inner_steps.step_order)
-                    from approval_steps as inner_steps
-                    where inner_steps.approvable_type = approval_steps.approvable_type
-                    and inner_steps.approvable_id = approval_steps.approvable_id
-                    and inner_steps.status = ?
-                )', [ApprovalStep::STATUS_PENDING]))
+            ->where(fn ($query) => $query
+                ->whereHas('approvalSteps', fn ($query) => $query
+                    ->where('status', ApprovalStep::STATUS_PENDING)
+                    ->whereIn('role', $this->approvalRolesFor($actor))
+                    ->whereRaw('step_order = (
+                        select min(inner_steps.step_order)
+                        from approval_steps as inner_steps
+                        where inner_steps.approvable_type = approval_steps.approvable_type
+                        and inner_steps.approvable_id = approval_steps.approvable_id
+                        and inner_steps.status = ?
+                    )', [ApprovalStep::STATUS_PENDING]))
+                ->orWhere(fn ($query) => $query
+                    ->whereDoesntHave('approvalSteps')
+                    ->where('supervisor_status', LeaveRequest::DECISION_APPROVED)
+                    ->where('hr_status', LeaveRequest::DECISION_PENDING)))
             ->when($status, fn ($query) => $query->where('status', $status))
             ->when($filters['supervisor_status'] ?? null, fn ($query, $supervisorStatus) => $query->where('supervisor_status', $supervisorStatus))
             ->when($filters['hr_status'] ?? null, fn ($query, $hrStatus) => $query->where('hr_status', $hrStatus))
@@ -181,16 +186,20 @@ class LeaveService
             ->with($this->leaveRequestRelations())
             ->where('company_id', $supervisor->company_id)
             ->whereIn('employee_id', $directReportIds)
-            ->whereHas('approvalSteps', fn ($query) => $query
-                ->where('status', ApprovalStep::STATUS_PENDING)
-                ->where('role', 'supervisor')
-                ->whereRaw('step_order = (
-                    select min(inner_steps.step_order)
-                    from approval_steps as inner_steps
-                    where inner_steps.approvable_type = approval_steps.approvable_type
-                    and inner_steps.approvable_id = approval_steps.approvable_id
-                    and inner_steps.status = ?
-                )', [ApprovalStep::STATUS_PENDING]))
+            ->where(fn ($query) => $query
+                ->whereHas('approvalSteps', fn ($query) => $query
+                    ->where('status', ApprovalStep::STATUS_PENDING)
+                    ->where('role', 'supervisor')
+                    ->whereRaw('step_order = (
+                        select min(inner_steps.step_order)
+                        from approval_steps as inner_steps
+                        where inner_steps.approvable_type = approval_steps.approvable_type
+                        and inner_steps.approvable_id = approval_steps.approvable_id
+                        and inner_steps.status = ?
+                    )', [ApprovalStep::STATUS_PENDING]))
+                ->orWhere(fn ($query) => $query
+                    ->whereDoesntHave('approvalSteps')
+                    ->where('supervisor_status', LeaveRequest::DECISION_PENDING)))
             ->when($status, fn ($query) => $query->where('status', $status))
             ->when($supervisorStatus, fn ($query) => $query->where('supervisor_status', $supervisorStatus))
             ->when($filters['hr_status'] ?? null, fn ($query, $hrStatus) => $query->where('hr_status', $hrStatus))

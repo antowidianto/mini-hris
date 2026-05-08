@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PayrollComponentController;
 use App\Http\Controllers\Api\PayrollController;
 use App\Http\Controllers\Api\PositionController;
+use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SettingController;
 use App\Support\ApiResponse;
 use Illuminate\Support\Facades\Route;
@@ -71,6 +72,7 @@ Route::middleware(['auth:sanctum', 'role:admin,hr'])->group(function () {
     Route::get('/exports/employees', [ImportExportController::class, 'exportEmployees']);
     Route::get('/exports/payroll', [ImportExportController::class, 'exportPayroll']);
     Route::get('/exports/attendance-recap', [ImportExportController::class, 'exportAttendanceRecap']);
+    Route::get('/reports/operational', [ReportController::class, 'operational']);
     Route::get('/leaves/approvals', [LeaveController::class, 'approvals']);
     Route::post('/leaves/{leaveRequest}/approve', [LeaveController::class, 'approve']);
     Route::post('/leaves/{leaveRequest}/reject', [LeaveController::class, 'reject']);

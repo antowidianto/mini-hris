@@ -30,7 +30,7 @@ return new class extends Migration
         });
 
         Schema::table('payrolls', function (Blueprint $table) {
-            $table->string('approval_status', 20)->default('pending')->after('generated_at');
+            $table->string('approval_status', 20)->default('approved')->after('generated_at');
             $table->text('approval_notes')->nullable()->after('approval_status');
             $table->foreignId('approved_by')->nullable()->after('approval_notes')->constrained('users')->nullOnDelete();
             $table->timestamp('approved_at')->nullable()->after('approved_by');

@@ -243,6 +243,35 @@ class LeaveManagementTest extends TestCase
             ->assertJsonValidationErrors(['supervisor_status'], 'errors');
     }
 
+    public function test_legacy_leave_requests_without_runtime_steps_remain_in_approval_queues(): void
+    {
+        [$employeeUser, $leaveType, $supervisorUser] = $this->employeeWithSupervisorAndLeaveBalance();
+        $hr = User::factory()->create(['role' => User::ROLE_HR]);
+
+        $supervisorPending = LeaveRequest::factory()->for($employeeUser->employee)->for($leaveType)->create([
+            'status' => LeaveRequest::STATUS_PENDING,
+            'supervisor_status' => LeaveRequest::DECISION_PENDING,
+            'hr_status' => LeaveRequest::DECISION_PENDING,
+        ]);
+        $hrPending = LeaveRequest::factory()->for($employeeUser->employee)->for($leaveType)->create([
+            'status' => LeaveRequest::STATUS_PENDING,
+            'supervisor_status' => LeaveRequest::DECISION_APPROVED,
+            'hr_status' => LeaveRequest::DECISION_PENDING,
+        ]);
+
+        Sanctum::actingAs($supervisorUser);
+
+        $this->getJson('/api/leaves/supervisor-approvals')
+            ->assertOk()
+            ->assertJsonFragment(['id' => $supervisorPending->id]);
+
+        Sanctum::actingAs($hr);
+
+        $this->getJson('/api/leaves/approvals')
+            ->assertOk()
+            ->assertJsonFragment(['id' => $hrPending->id]);
+    }
+
     public function test_leave_can_use_one_step_hr_approval_flow(): void
     {
         [$employeeUser, $leaveType] = $this->employeeWithSupervisorAndLeaveBalance();

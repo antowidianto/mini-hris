@@ -65,6 +65,23 @@ const decimalSettingKeys = new Set([
   'transport_allowance_default',
   'pph21_default_deduction',
 ])
+const approvalRoleOptions = {
+  leave: [
+    { value: 'supervisor', label: 'Supervisor' },
+    { value: 'hr', label: 'HR' },
+    { value: 'admin', label: 'Admin' },
+  ],
+  payroll: [
+    { value: 'hr', label: 'HR' },
+    { value: 'admin', label: 'Admin' },
+  ],
+  request: [
+    { value: 'supervisor', label: 'Supervisor' },
+    { value: 'hr', label: 'HR' },
+    { value: 'admin', label: 'Admin' },
+    { value: 'employee', label: 'Employee' },
+  ],
+}
 
 function fillForm(settings) {
   Object.entries(settings).forEach(([key, value]) => {
@@ -182,6 +199,18 @@ function addApprovalFlow() {
 
 function removeApprovalFlow(index) {
   approvalFlows.value.splice(index, 1)
+}
+
+function roleOptions(module) {
+  return approvalRoleOptions[module] ?? approvalRoleOptions.request
+}
+
+function ensureFlowRole(flow) {
+  const options = roleOptions(flow.module)
+
+  if (!options.some((option) => option.value === flow.role)) {
+    flow.role = options[0].value
+  }
 }
 
 async function saveApprovalFlows() {
@@ -457,17 +486,14 @@ onMounted(loadSettings)
         </div>
 
         <div class="mt-4 grid gap-3 rounded-md border border-hris-border bg-hris-soft p-3 md:grid-cols-5">
-          <select v-model="newFlow.module" class="rounded-md border border-hris-border px-3 py-2 text-sm">
+          <select v-model="newFlow.module" class="rounded-md border border-hris-border px-3 py-2 text-sm" @change="ensureFlowRole(newFlow)">
             <option value="leave">Leave</option>
             <option value="payroll">Payroll</option>
             <option value="request">Request</option>
           </select>
           <input v-model.number="newFlow.step_order" type="number" min="1" max="20" class="rounded-md border border-hris-border px-3 py-2 text-sm" />
           <select v-model="newFlow.role" class="rounded-md border border-hris-border px-3 py-2 text-sm">
-            <option value="supervisor">Supervisor</option>
-            <option value="hr">HR</option>
-            <option value="admin">Admin</option>
-            <option value="employee">Employee</option>
+            <option v-for="option in roleOptions(newFlow.module)" :key="option.value" :value="option.value">{{ option.label }}</option>
           </select>
           <label class="inline-flex items-center gap-2 text-sm">
             <input v-model="newFlow.is_active" type="checkbox" class="h-4 w-4 rounded border-hris-border text-hris-primary" />
@@ -493,7 +519,7 @@ onMounted(loadSettings)
               </tr>
               <tr v-for="(flow, index) in approvalFlows" :key="flow.id">
                 <td class="px-3 py-2">
-                  <select v-model="flow.module" class="w-full min-w-32 rounded-md border border-hris-border px-3 py-2 text-sm">
+                  <select v-model="flow.module" class="w-full min-w-32 rounded-md border border-hris-border px-3 py-2 text-sm" @change="ensureFlowRole(flow)">
                     <option value="leave">Leave</option>
                     <option value="payroll">Payroll</option>
                     <option value="request">Request</option>
@@ -504,10 +530,7 @@ onMounted(loadSettings)
                 </td>
                 <td class="px-3 py-2">
                   <select v-model="flow.role" class="w-full min-w-32 rounded-md border border-hris-border px-3 py-2 text-sm">
-                    <option value="supervisor">Supervisor</option>
-                    <option value="hr">HR</option>
-                    <option value="admin">Admin</option>
-                    <option value="employee">Employee</option>
+                    <option v-for="option in roleOptions(flow.module)" :key="option.value" :value="option.value">{{ option.label }}</option>
                   </select>
                 </td>
                 <td class="px-3 py-2">
