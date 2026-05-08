@@ -6,6 +6,11 @@ import {
   getMonthlyAttendanceRecap,
   importAttendancePlaceholder,
 } from '@/services/attendance'
+import EmptyState from '@/components/EmptyState.vue'
+import LoadingState from '@/components/LoadingState.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import PaginationControls from '@/components/PaginationControls.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
 import { getDepartments, getEmployees } from '@/services/employees'
 
 const filters = reactive({
@@ -34,18 +39,6 @@ const importForm = reactive({
   source: 'fingerprint',
   notes: '',
 })
-
-function statusClass(status) {
-  return {
-    present: 'bg-emerald-50 text-emerald-700',
-    late: 'bg-amber-50 text-amber-700',
-    absent: 'bg-red-50 text-red-700',
-    leave: 'bg-blue-50 text-blue-700',
-    sick: 'bg-purple-50 text-purple-700',
-    permission: 'bg-sky-50 text-sky-700',
-    alpha: 'bg-red-50 text-red-700',
-  }[status] ?? 'bg-slate-100 text-slate-600'
-}
 
 function currentYearMonth() {
   const dateFrom = filters.date_from ? new Date(`${filters.date_from}T00:00:00`) : new Date()
@@ -144,17 +137,13 @@ onMounted(async () => {
 
 <template>
   <section class="mx-auto max-w-7xl">
-    <div class="border-b border-hris-border pb-5">
-      <p class="text-xs font-semibold uppercase text-hris-accent">Time</p>
-      <h2 class="mt-1 text-2xl font-semibold">Attendance Report</h2>
-      <p class="mt-1 text-sm text-hris-muted">Review attendance records across employees and teams.</p>
-    </div>
+    <PageHeader eyebrow="Time" title="Attendance Report" description="Review attendance records across employees and teams." />
 
     <div v-if="error" class="mt-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
       {{ error }}
     </div>
 
-    <form class="mt-5 grid gap-3 rounded-md border border-hris-border bg-hris-panel p-4 lg:grid-cols-8" @submit.prevent="applyFilters">
+    <form class="ui-filter-bar mt-5 grid gap-3 rounded-md border border-hris-border bg-hris-panel p-4 lg:grid-cols-8" @submit.prevent="applyFilters">
       <input
         v-model="filters.date_from"
         type="date"
@@ -213,8 +202,8 @@ onMounted(async () => {
     <div class="mt-5 grid gap-5 lg:grid-cols-[1fr_360px]">
       <div class="rounded-md border border-hris-border bg-hris-panel p-4">
         <h3 class="font-semibold">Monthly Attendance Recap</h3>
-        <div v-if="recapLoading" class="mt-4 text-sm text-hris-muted">Loading recap...</div>
-        <div v-else-if="recap.length === 0" class="mt-4 text-sm text-hris-muted">No monthly recap records found.</div>
+        <LoadingState v-if="recapLoading" label="Loading recap..." />
+        <EmptyState v-else-if="recap.length === 0" title="No monthly recap records found" />
         <div v-else class="mt-4 overflow-x-auto">
           <table class="min-w-full divide-y divide-hris-border text-sm">
             <thead class="bg-hris-surface text-left text-xs uppercase text-hris-muted">
@@ -283,11 +272,9 @@ onMounted(async () => {
       </form>
     </div>
 
-    <div class="mt-5 overflow-hidden rounded-md border border-hris-border bg-hris-panel">
-      <div v-if="loading" class="p-6 text-sm text-hris-muted">Loading report...</div>
-      <div v-else-if="attendances.length === 0" class="p-6 text-sm text-hris-muted">
-        No attendance records found.
-      </div>
+    <div class="ui-table-card mt-5 overflow-hidden rounded-md border border-hris-border bg-hris-panel">
+      <LoadingState v-if="loading" label="Loading report..." />
+      <EmptyState v-else-if="attendances.length === 0" title="No attendance records found" message="Adjust filters or import attendance data." />
       <div v-else class="overflow-x-auto">
         <table class="min-w-full divide-y divide-hris-border text-sm">
           <thead class="bg-hris-surface text-left text-xs uppercase text-hris-muted">
@@ -315,9 +302,7 @@ onMounted(async () => {
               <td class="px-4 py-3">{{ attendance.shift_start ?? '--' }} - {{ attendance.shift_end ?? '--' }}</td>
               <td class="px-4 py-3">{{ attendance.overtime_minutes ?? 0 }} min</td>
               <td class="px-4 py-3">
-                <span class="rounded-md px-2 py-1 text-xs font-semibold" :class="statusClass(attendance.status)">
-                  {{ attendance.status }}
-                </span>
+                <StatusBadge :status="attendance.status" />
               </td>
               <td class="px-4 py-3">{{ attendance.attendance_source ?? '-' }}</td>
               <td class="px-4 py-3">{{ attendance.employee?.department?.name }}</td>
@@ -327,26 +312,6 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div v-if="meta" class="mt-4 flex items-center justify-between gap-3 text-sm">
-      <p class="text-hris-muted">Page {{ meta.current_page }} of {{ meta.last_page }}</p>
-      <div class="flex gap-2">
-        <button
-          type="button"
-          class="rounded-md border border-hris-border px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
-          :disabled="meta.current_page <= 1"
-          @click="loadReport(meta.current_page - 1)"
-        >
-          Previous
-        </button>
-        <button
-          type="button"
-          class="rounded-md border border-hris-border px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
-          :disabled="meta.current_page >= meta.last_page"
-          @click="loadReport(meta.current_page + 1)"
-        >
-          Next
-        </button>
-      </div>
-    </div>
+    <PaginationControls :meta="meta" @change="loadReport" />
   </section>
 </template>

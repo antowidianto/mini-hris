@@ -115,26 +115,26 @@ onMounted(loadNotificationSummary)
 <template>
   <div class="app-shell min-h-screen text-hris-ink">
     <aside
-      class="app-sidebar fixed inset-y-0 left-0 hidden w-72 border-r border-hris-border bg-hris-panel px-5 py-6 lg:block"
+      class="app-sidebar fixed inset-y-0 left-0 hidden w-64 border-r border-slate-800 bg-slate-900 px-4 py-5 text-white lg:block"
     >
       <RouterLink to="/" class="flex items-center gap-3 rounded-md px-2 py-1.5">
         <span class="app-brand-mark">HR</span>
         <span>
           <span class="block text-base font-semibold">Mini HRIS</span>
-          <span class="block text-xs text-hris-muted">Indonesia SME Edition</span>
+          <span class="block text-xs text-slate-400">Indonesia SME Edition</span>
         </span>
       </RouterLink>
 
-      <nav class="mt-8 space-y-5">
+      <nav class="mt-7 space-y-5">
         <section v-for="group in visibleNavigationGroups" :key="group.label">
-          <p class="px-3 pb-2 text-xs font-semibold uppercase text-hris-muted">{{ group.label }}</p>
+          <p class="px-3 pb-2 text-xs font-semibold uppercase text-slate-400">{{ group.label }}</p>
 
           <RouterLink
             v-for="item in group.items"
             :key="item.to"
             :to="item.to"
-            class="mb-1 block rounded-md px-3 py-2 text-sm font-medium text-hris-muted hover:bg-hris-surface hover:text-hris-ink"
-            active-class="bg-hris-primary text-white shadow-sm hover:bg-hris-primary hover:text-white"
+            class="app-nav-link mb-1 block rounded-md px-3 py-2 pl-5 text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white"
+            active-class="bg-white/10 text-white shadow-sm hover:bg-white/10 hover:text-white"
           >
             {{ item.label }}
           </RouterLink>
@@ -142,29 +142,31 @@ onMounted(loadNotificationSummary)
       </nav>
     </aside>
 
-    <div class="lg:pl-72">
-      <header class="sticky top-0 z-30 border-b border-hris-border bg-hris-panel/95 px-5 py-4 backdrop-blur">
-        <div class="flex items-center justify-between gap-4">
-          <div class="min-w-0">
-            <p class="text-xs font-semibold uppercase text-hris-accent">Workspace</p>
-            <h1 class="truncate text-xl font-semibold">{{ pageTitle }}</h1>
-          </div>
+    <div class="lg:pl-64">
+      <header class="sticky top-0 z-30 px-4 py-4 sm:px-5 lg:px-6">
+        <div class="rounded-xl border border-hris-border bg-hris-panel/95 px-4 py-3 shadow-sm backdrop-blur">
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
+              <p class="text-xs font-semibold uppercase tracking-wide text-hris-muted">Admin Workspace</p>
+              <h1 class="truncate text-xl font-semibold">{{ pageTitle }}</h1>
+            </div>
 
-          <div class="flex items-center gap-3">
-            <div class="relative">
-              <button
-                type="button"
-                class="relative rounded-md border border-hris-border px-3 py-2 text-sm font-medium text-hris-ink hover:bg-hris-surface"
-                @click="toggleNotificationMenu"
-              >
-                Notifications
-                <span
-                  v-if="unreadCount > 0"
-                  class="absolute -right-2 -top-2 min-w-5 rounded-full bg-red-600 px-1.5 py-0.5 text-center text-xs font-semibold text-white"
+            <div class="flex items-center gap-3">
+              <div class="relative">
+                <button
+                  type="button"
+                  class="relative rounded-md border border-hris-border bg-hris-panel px-3 py-2 text-sm font-medium text-hris-ink hover:bg-hris-surface"
+                  @click="toggleNotificationMenu"
                 >
-                  {{ unreadCount > 99 ? '99+' : unreadCount }}
-                </span>
-              </button>
+                  <span class="hidden sm:inline">Notifications</span>
+                  <span class="sm:hidden">Alerts</span>
+                  <span
+                    v-if="unreadCount > 0"
+                    class="absolute -right-2 -top-2 min-w-5 rounded-full bg-red-600 px-1.5 py-0.5 text-center text-xs font-semibold text-white"
+                  >
+                    {{ unreadCount > 99 ? '99+' : unreadCount }}
+                  </span>
+                </button>
 
               <div
                 v-if="notificationMenuOpen"
@@ -221,44 +223,46 @@ onMounted(loadNotificationSummary)
               </div>
             </div>
 
-            <div class="hidden text-right sm:block">
-              <p class="text-sm font-medium">{{ auth.user?.name }}</p>
-              <p class="text-xs uppercase text-hris-muted">{{ auth.user?.role }}</p>
-            </div>
+              <div class="hidden text-right sm:block">
+                <p class="text-sm font-medium">{{ auth.user?.name }}</p>
+                <p class="text-xs uppercase text-hris-muted">{{ auth.user?.role }}</p>
+              </div>
 
-            <div
-              class="grid size-9 place-items-center rounded-md bg-hris-primary text-sm font-semibold text-white"
-            >
-              {{ userInitials }}
-            </div>
+              <div
+                class="grid size-9 place-items-center rounded-md bg-hris-primary text-sm font-semibold text-white ring-2 ring-blue-100"
+              >
+                {{ userInitials }}
+              </div>
 
-            <button
-              type="button"
-              class="rounded-md border border-hris-border px-3 py-2 text-sm font-medium text-hris-ink hover:bg-hris-surface disabled:cursor-not-allowed disabled:opacity-60"
-              :disabled="loggingOut"
-              @click="handleLogout"
-            >
-              {{ loggingOut ? 'Signing out...' : 'Logout' }}
-            </button>
+              <button
+                type="button"
+                class="rounded-md border border-hris-border px-3 py-2 text-sm font-medium text-hris-ink hover:bg-hris-surface disabled:cursor-not-allowed disabled:opacity-60"
+                :disabled="loggingOut"
+                @click="handleLogout"
+              >
+                {{ loggingOut ? 'Signing out...' : 'Logout' }}
+              </button>
+            </div>
           </div>
-        </div>
 
-        <nav class="mt-4 flex gap-2 overflow-x-auto lg:hidden">
-          <template v-for="group in visibleNavigationGroups" :key="group.label">
-            <RouterLink
-              v-for="item in group.items"
-              :key="item.to"
-              :to="item.to"
-              class="shrink-0 rounded-md border border-hris-border px-3 py-2 text-sm font-medium text-hris-muted"
-              active-class="border-hris-primary bg-hris-primary text-white"
-            >
-              {{ item.label }}
-            </RouterLink>
-          </template>
-        </nav>
+          <nav class="mt-3 flex gap-2 overflow-x-auto lg:hidden">
+            <div v-for="group in visibleNavigationGroups" :key="group.label" class="flex shrink-0 gap-2">
+              <span class="self-center px-1 text-xs font-semibold uppercase text-hris-muted">{{ group.label }}</span>
+              <RouterLink
+                v-for="item in group.items"
+                :key="item.to"
+                :to="item.to"
+                class="shrink-0 rounded-md border border-hris-border bg-hris-panel px-3 py-2 text-sm font-medium text-hris-muted"
+                active-class="border-hris-primary bg-hris-primary text-white"
+              >
+                {{ item.label }}
+              </RouterLink>
+            </div>
+          </nav>
+        </div>
       </header>
 
-      <main class="px-4 py-6 sm:px-5 lg:px-8">
+      <main class="px-4 pb-6 sm:px-5 lg:px-6">
         <RouterView />
       </main>
     </div>

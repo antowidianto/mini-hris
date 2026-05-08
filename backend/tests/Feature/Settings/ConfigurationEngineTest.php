@@ -147,6 +147,68 @@ class ConfigurationEngineTest extends TestCase
         ]);
     }
 
+    public function test_approval_flow_configuration_rejects_ambiguous_or_missing_runtime_steps(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => User::ROLE_ADMIN]));
+
+        $this->putJson('/api/approval-flows', [
+            'flows' => [
+                [
+                    'module' => ApprovalFlow::MODULE_LEAVE,
+                    'step_order' => 1,
+                    'role' => User::ROLE_HR,
+                    'is_active' => true,
+                ],
+                [
+                    'module' => ApprovalFlow::MODULE_LEAVE,
+                    'step_order' => 1,
+                    'role' => User::ROLE_ADMIN,
+                    'is_active' => true,
+                ],
+                [
+                    'module' => ApprovalFlow::MODULE_PAYROLL,
+                    'step_order' => 1,
+                    'role' => User::ROLE_HR,
+                    'is_active' => true,
+                ],
+            ],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['flows.1.step_order'], 'errors');
+
+        $this->putJson('/api/approval-flows', [
+            'flows' => [
+                [
+                    'module' => ApprovalFlow::MODULE_LEAVE,
+                    'step_order' => 1,
+                    'role' => User::ROLE_HR,
+                    'is_active' => true,
+                ],
+            ],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['flows'], 'errors');
+
+        $this->putJson('/api/approval-flows', [
+            'flows' => [
+                [
+                    'module' => ApprovalFlow::MODULE_LEAVE,
+                    'step_order' => 1,
+                    'role' => 'supervisor',
+                    'is_active' => true,
+                ],
+                [
+                    'module' => ApprovalFlow::MODULE_PAYROLL,
+                    'step_order' => 1,
+                    'role' => 'supervisor',
+                    'is_active' => true,
+                ],
+            ],
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['flows', 'flows.1.role'], 'errors');
+    }
+
     public function test_only_admin_can_manage_configuration_engine(): void
     {
         Sanctum::actingAs(User::factory()->create(['role' => User::ROLE_HR]));

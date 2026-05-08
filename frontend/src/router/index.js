@@ -23,6 +23,7 @@ import NotificationListView from '@/views/notifications/NotificationListView.vue
 import PayrollDetailView from '@/views/payroll/PayrollDetailView.vue'
 import PayrollListView from '@/views/payroll/PayrollListView.vue'
 import PayslipListView from '@/views/payroll/PayslipListView.vue'
+import OperationalReportsView from '@/views/reports/OperationalReportsView.vue'
 
 const routes = [
   {
@@ -201,6 +202,16 @@ const routes = [
           requiresAuth: true,
           label: 'Import & Export',
           roles: routeAccess.importExport,
+        },
+      },
+      {
+        path: 'reports',
+        name: 'reports',
+        component: OperationalReportsView,
+        meta: {
+          requiresAuth: true,
+          label: 'Reports',
+          roles: routeAccess.reports,
         },
       },
       {

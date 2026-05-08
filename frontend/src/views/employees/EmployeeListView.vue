@@ -3,6 +3,11 @@ import { onMounted, reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import ConfirmationModal from '@/components/ConfirmationModal.vue'
+import EmptyState from '@/components/EmptyState.vue'
+import LoadingState from '@/components/LoadingState.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import PaginationControls from '@/components/PaginationControls.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
 import {
   deactivateEmployee,
   getBranches,
@@ -119,21 +124,18 @@ onMounted(async () => {
 
 <template>
   <section class="mx-auto max-w-7xl">
-    <div class="flex flex-col justify-between gap-4 border-b border-hris-border pb-5 sm:flex-row">
-      <div>
-        <h2 class="text-2xl font-semibold">Employees</h2>
-        <p class="mt-1 text-sm text-hris-muted">Manage employee profiles and account links.</p>
-      </div>
+    <PageHeader title="Employees" description="Manage employee profiles and account links.">
+      <template #actions>
+        <RouterLink
+          to="/employees/new"
+          class="self-start rounded-md bg-hris-primary px-4 py-2 text-sm font-semibold text-white hover:bg-hris-primary-dark"
+        >
+          Add Employee
+        </RouterLink>
+      </template>
+    </PageHeader>
 
-      <RouterLink
-        to="/employees/new"
-        class="self-start rounded-md bg-hris-primary px-4 py-2 text-sm font-semibold text-white hover:bg-hris-primary-dark"
-      >
-        Add Employee
-      </RouterLink>
-    </div>
-
-    <form class="mt-5 grid gap-3 md:grid-cols-8" @submit.prevent="loadEmployees(1)">
+    <form class="ui-filter-bar mt-5 grid gap-3 rounded-md border border-hris-border bg-hris-panel p-4 md:grid-cols-8" @submit.prevent="loadEmployees(1)">
       <input
         v-model="filters.search"
         type="search"
@@ -211,9 +213,9 @@ onMounted(async () => {
       {{ error }}
     </div>
 
-    <div class="mt-5 overflow-hidden rounded-md border border-hris-border bg-hris-panel">
-      <div v-if="loading" class="p-6 text-sm text-hris-muted">Loading employees...</div>
-      <div v-else-if="employees.length === 0" class="p-6 text-sm text-hris-muted">No employees found.</div>
+    <div class="ui-table-card mt-5 overflow-hidden rounded-md border border-hris-border bg-hris-panel">
+      <LoadingState v-if="loading" label="Loading employees..." />
+      <EmptyState v-else-if="employees.length === 0" title="No employees found" message="Adjust filters or add a new employee record." />
 
       <div v-else class="overflow-x-auto">
         <table class="min-w-full divide-y divide-hris-border text-sm">
@@ -240,16 +242,7 @@ onMounted(async () => {
               <td class="px-4 py-3">{{ employee.position?.name }}</td>
               <td class="px-4 py-3">{{ employmentTypeLabel(employee.employment_type) }}</td>
               <td class="px-4 py-3">
-                <span
-                  class="rounded-md px-2 py-1 text-xs font-semibold"
-                  :class="
-                    employee.employment_status === 'active'
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'bg-slate-100 text-slate-600'
-                  "
-                >
-                  {{ employee.employment_status }}
-                </span>
+                <StatusBadge :status="employee.employment_status" />
               </td>
               <td class="px-4 py-3">{{ currency(employee.basic_salary) }}</td>
               <td class="px-4 py-3">
@@ -276,27 +269,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div v-if="meta" class="mt-4 flex items-center justify-between gap-3 text-sm">
-      <p class="text-hris-muted">Page {{ meta.current_page }} of {{ meta.last_page }}</p>
-      <div class="flex gap-2">
-        <button
-          type="button"
-          class="rounded-md border border-hris-border px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
-          :disabled="meta.current_page <= 1"
-          @click="loadEmployees(meta.current_page - 1)"
-        >
-          Previous
-        </button>
-        <button
-          type="button"
-          class="rounded-md border border-hris-border px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
-          :disabled="meta.current_page >= meta.last_page"
-          @click="loadEmployees(meta.current_page + 1)"
-        >
-          Next
-        </button>
-      </div>
-    </div>
+    <PaginationControls :meta="meta" @change="loadEmployees" />
 
     <ConfirmationModal
       :open="Boolean(selectedEmployee)"

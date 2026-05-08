@@ -3,10 +3,18 @@ import { onMounted, reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import ConfirmationModal from '@/components/ConfirmationModal.vue'
+import EmptyState from '@/components/EmptyState.vue'
+import LoadingState from '@/components/LoadingState.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import PaginationControls from '@/components/PaginationControls.vue'
+import StatusBadge from '@/components/StatusBadge.vue'
+import { ROLES } from '@/config/roles'
 import { getEmployees } from '@/services/employees'
 import { approvePayroll, generatePayroll, getPayrolls, rejectPayroll } from '@/services/payroll'
+import { useAuthStore } from '@/stores/authStore'
 
 const currentDate = new Date()
+const auth = useAuthStore()
 
 const filters = reactive({
   period_year: currentDate.getFullYear(),
@@ -55,14 +63,6 @@ function requestError(requestError, fallback) {
   return firstError ?? requestError.response?.data?.message ?? fallback
 }
 
-function statusClass(status) {
-  return {
-    pending: 'bg-amber-50 text-amber-700',
-    approved: 'bg-emerald-50 text-emerald-700',
-    rejected: 'bg-red-50 text-red-700',
-  }[status] ?? 'bg-slate-100 text-slate-600'
-}
-
 function workflowLabel(payroll) {
   if (payroll.approval_status !== 'pending') {
     return payroll.approval_status
@@ -71,6 +71,16 @@ function workflowLabel(payroll) {
   return payroll.current_approval_step
     ? `Waiting ${payroll.current_approval_step.role}`
     : 'No approval step'
+}
+
+function canDecidePayroll(payroll) {
+  const role = payroll.current_approval_step?.role
+
+  if (!role) {
+    return false
+  }
+
+  return auth.role === role || (auth.role === ROLES.ADMIN && role === ROLES.HR)
 }
 
 async function loadLookups() {
@@ -179,11 +189,7 @@ onMounted(async () => {
 
 <template>
   <section class="mx-auto max-w-7xl">
-    <div class="border-b border-hris-border pb-5">
-      <p class="text-xs font-semibold uppercase text-hris-accent">Payroll</p>
-      <h2 class="mt-1 text-2xl font-semibold">Payroll</h2>
-      <p class="mt-1 text-sm text-hris-muted">Generate monthly payroll and review salary results.</p>
-    </div>
+    <PageHeader eyebrow="Payroll" title="Payroll" description="Generate monthly payroll and review salary results." />
 
     <div v-if="error" class="mt-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
       {{ error }}
@@ -192,7 +198,7 @@ onMounted(async () => {
       {{ success }}
     </div>
 
-    <form class="mt-5 grid gap-3 rounded-md border border-hris-border bg-hris-panel p-4 lg:grid-cols-6" @submit.prevent="handleGenerate">
+    <form class="ui-filter-bar mt-5 grid gap-3 rounded-md border border-hris-border bg-hris-panel p-4 lg:grid-cols-6" @submit.prevent="handleGenerate">
       <input v-model.number="form.period_year" type="number" min="2020" max="2100" class="rounded-md border border-hris-border px-3 py-2 text-sm" aria-label="Payroll year" />
       <input v-model.number="form.period_month" type="number" min="1" max="12" class="rounded-md border border-hris-border px-3 py-2 text-sm" aria-label="Payroll month" />
       <select v-model="form.employee_id" class="rounded-md border border-hris-border px-3 py-2 text-sm lg:col-span-2">
@@ -216,7 +222,7 @@ onMounted(async () => {
       </button>
     </form>
 
-    <form class="mt-5 grid gap-3 rounded-md border border-hris-border bg-hris-panel p-4 sm:grid-cols-6" @submit.prevent="loadPayrolls(1)">
+    <form class="ui-filter-bar mt-5 grid gap-3 rounded-md border border-hris-border bg-hris-panel p-4 sm:grid-cols-6" @submit.prevent="loadPayrolls(1)">
       <input v-model.number="filters.period_year" type="number" min="2020" max="2100" class="rounded-md border border-hris-border px-3 py-2 text-sm" aria-label="Filter year" />
       <input v-model.number="filters.period_month" type="number" min="1" max="12" class="rounded-md border border-hris-border px-3 py-2 text-sm" aria-label="Filter month" />
       <select v-model="filters.employee_id" class="rounded-md border border-hris-border px-3 py-2 text-sm">
@@ -239,9 +245,9 @@ onMounted(async () => {
       </button>
     </form>
 
-    <div class="mt-5 overflow-hidden rounded-md border border-hris-border bg-hris-panel">
-      <div v-if="loading" class="p-6 text-sm text-hris-muted">Loading payroll...</div>
-      <div v-else-if="payrolls.length === 0" class="p-6 text-sm text-hris-muted">No payroll records found.</div>
+    <div class="ui-table-card mt-5 overflow-hidden rounded-md border border-hris-border bg-hris-panel">
+      <LoadingState v-if="loading" label="Loading payroll..." />
+      <EmptyState v-else-if="payrolls.length === 0" title="No payroll records found" message="Adjust filters or generate payroll for the selected period." />
       <div v-else class="overflow-x-auto">
         <table class="min-w-full divide-y divide-hris-border text-sm">
           <thead class="bg-hris-surface text-left text-xs uppercase text-hris-muted">
@@ -267,9 +273,7 @@ onMounted(async () => {
               <td class="px-4 py-3">{{ currency(payroll.total_deductions) }}</td>
               <td class="px-4 py-3 font-semibold">{{ currency(payroll.take_home_pay ?? payroll.net_salary) }}</td>
               <td class="px-4 py-3">
-                <span class="rounded-md px-2 py-1 text-xs font-semibold" :class="statusClass(payroll.approval_status)">
-                  {{ workflowLabel(payroll) }}
-                </span>
+                <StatusBadge :status="payroll.approval_status" :label="workflowLabel(payroll)" />
               </td>
               <td class="px-4 py-3">
                 <textarea
@@ -286,7 +290,7 @@ onMounted(async () => {
                   <RouterLink class="text-hris-primary hover:underline" :to="`/payroll/${payroll.id}`">
                     View
                   </RouterLink>
-                  <template v-if="payroll.approval_status === 'pending'">
+                  <template v-if="payroll.approval_status === 'pending' && canDecidePayroll(payroll)">
                     <button type="button" class="text-emerald-700 hover:underline" @click="requestDecision(payroll, 'approve')">
                       Approve
                     </button>
@@ -302,17 +306,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div v-if="meta" class="mt-4 flex items-center justify-between gap-3 text-sm">
-      <p class="text-hris-muted">Page {{ meta.current_page }} of {{ meta.last_page }}</p>
-      <div class="flex gap-2">
-        <button type="button" class="rounded-md border border-hris-border px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50" :disabled="meta.current_page <= 1" @click="loadPayrolls(meta.current_page - 1)">
-          Previous
-        </button>
-        <button type="button" class="rounded-md border border-hris-border px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50" :disabled="meta.current_page >= meta.last_page" @click="loadPayrolls(meta.current_page + 1)">
-          Next
-        </button>
-      </div>
-    </div>
+    <PaginationControls :meta="meta" @change="loadPayrolls" />
 
     <ConfirmationModal
       :open="Boolean(decision)"
