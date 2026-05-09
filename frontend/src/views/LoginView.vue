@@ -2,6 +2,7 @@
 import { reactive } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
+import BaseIcon from '@/components/BaseIcon.vue'
 import { useAuthStore } from '@/stores/authStore'
 
 const auth = useAuthStore()
@@ -29,13 +30,18 @@ async function submitLogin() {
 </script>
 
 <template>
-  <main class="grid min-h-screen place-items-center bg-hris-surface px-5">
+  <main class="login-shell grid min-h-screen place-items-center px-5 py-10">
     <form
-      class="w-full max-w-sm rounded-md border border-hris-border bg-hris-panel p-6"
+      class="w-full max-w-md rounded-3xl border border-white/75 bg-hris-panel/95 p-8 shadow-2xl shadow-slate-300/50 backdrop-blur"
       @submit.prevent="submitLogin"
     >
-      <h1 class="text-xl font-semibold">Mini HRIS</h1>
-      <p class="mt-2 text-sm text-hris-muted">Sign in to your SaaS workspace</p>
+      <div class="flex items-center gap-3">
+        <span class="app-brand-mark"><BaseIcon name="spark" /></span>
+        <div>
+          <h1 class="text-2xl font-semibold tracking-tight">Mini HRIS</h1>
+          <p class="mt-1 text-sm text-hris-muted">Sign in to your SaaS workspace</p>
+        </div>
+      </div>
 
       <div class="mt-6 space-y-4">
         <label class="block">
@@ -45,7 +51,7 @@ async function submitLogin() {
             type="email"
             required
             autocomplete="email"
-            class="mt-1 w-full rounded-md border border-hris-border bg-hris-surface px-3 py-2 text-sm"
+            class="mt-1 w-full rounded-xl border border-hris-border bg-hris-surface px-3 py-2.5 text-sm"
             placeholder="name@example.com"
           />
         </label>
@@ -57,7 +63,7 @@ async function submitLogin() {
             type="password"
             required
             autocomplete="current-password"
-            class="mt-1 w-full rounded-md border border-hris-border bg-hris-surface px-3 py-2 text-sm"
+            class="mt-1 w-full rounded-xl border border-hris-border bg-hris-surface px-3 py-2.5 text-sm"
             placeholder="Password"
           />
         </label>
@@ -68,7 +74,7 @@ async function submitLogin() {
 
         <button
           type="submit"
-          class="w-full rounded-md bg-hris-primary px-4 py-2 text-sm font-semibold text-white hover:bg-hris-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
+          class="w-full rounded-xl bg-hris-primary px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-200 hover:bg-hris-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="auth.loading"
         >
           {{ auth.loading ? 'Signing in...' : 'Login' }}

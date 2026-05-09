@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 
+import BaseIcon from '@/components/BaseIcon.vue'
 import { ADMIN_HR_ROLES } from '@/config/roles'
 import { navigationGroups } from '@/config/navigation'
 import {
@@ -115,13 +116,13 @@ onMounted(loadNotificationSummary)
 <template>
   <div class="app-shell min-h-screen text-hris-ink">
     <aside
-      class="app-sidebar fixed inset-y-0 left-0 hidden w-64 border-r border-slate-800 bg-slate-900 px-4 py-5 text-white lg:block"
+      class="app-sidebar fixed inset-y-0 left-0 hidden w-72 overflow-y-auto border-r border-slate-800 px-4 py-5 text-white lg:block"
     >
       <RouterLink to="/" class="flex items-center gap-3 rounded-md px-2 py-1.5">
-        <span class="app-brand-mark">HR</span>
+        <span class="app-brand-mark"><BaseIcon name="spark" /></span>
         <span>
-          <span class="block text-base font-semibold">Mini HRIS</span>
-          <span class="block text-xs text-slate-400">Indonesia SME Edition</span>
+          <span class="block text-base font-semibold tracking-tight">Mini HRIS</span>
+          <span class="block text-xs text-blue-100/75">Indonesia SME Edition</span>
         </span>
       </RouterLink>
 
@@ -133,21 +134,24 @@ onMounted(loadNotificationSummary)
             v-for="item in group.items"
             :key="item.to"
             :to="item.to"
-            class="app-nav-link mb-1 block rounded-md px-3 py-2 pl-5 text-sm font-medium text-slate-300 hover:bg-white/10 hover:text-white"
-            active-class="bg-white/10 text-white shadow-sm hover:bg-white/10 hover:text-white"
+            class="app-nav-link mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-blue-50/75 hover:bg-white/10 hover:text-white"
+            active-class="bg-white/15 text-white shadow-sm ring-1 ring-white/10 hover:bg-white/15 hover:text-white"
           >
-            {{ item.label }}
+            <span class="grid size-8 shrink-0 place-items-center rounded-lg bg-white/8 text-blue-100">
+              <BaseIcon :name="item.icon" />
+            </span>
+            <span class="truncate">{{ item.label }}</span>
           </RouterLink>
         </section>
       </nav>
     </aside>
 
-    <div class="lg:pl-64">
-      <header class="sticky top-0 z-30 px-4 py-4 sm:px-5 lg:px-6">
-        <div class="rounded-xl border border-hris-border bg-hris-panel/95 px-4 py-3 shadow-sm backdrop-blur">
+    <div class="lg:pl-72">
+      <header class="sticky top-0 z-30 px-4 py-4 sm:px-5 lg:px-8">
+        <div class="rounded-2xl border border-white/70 bg-hris-panel/90 px-4 py-3 shadow-lg shadow-slate-200/60 backdrop-blur">
           <div class="flex items-center justify-between gap-4">
             <div class="min-w-0">
-              <p class="text-xs font-semibold uppercase tracking-wide text-hris-muted">Admin Workspace</p>
+              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-hris-muted">Admin Workspace</p>
               <h1 class="truncate text-xl font-semibold">{{ pageTitle }}</h1>
             </div>
 
@@ -155,9 +159,10 @@ onMounted(loadNotificationSummary)
               <div class="relative">
                 <button
                   type="button"
-                  class="relative rounded-md border border-hris-border bg-hris-panel px-3 py-2 text-sm font-medium text-hris-ink hover:bg-hris-surface"
+                  class="relative inline-flex items-center gap-2 rounded-xl border border-hris-border bg-white px-3 py-2 text-sm font-medium text-hris-ink shadow-sm hover:bg-hris-surface"
                   @click="toggleNotificationMenu"
                 >
+                  <BaseIcon name="bell" />
                   <span class="hidden sm:inline">Notifications</span>
                   <span class="sm:hidden">Alerts</span>
                   <span
@@ -170,7 +175,7 @@ onMounted(loadNotificationSummary)
 
               <div
                 v-if="notificationMenuOpen"
-                class="absolute right-0 mt-2 w-80 overflow-hidden rounded-md border border-hris-border bg-hris-panel shadow-lg"
+                class="absolute right-0 mt-2 w-80 overflow-hidden rounded-2xl border border-hris-border bg-hris-panel shadow-xl shadow-slate-200/80"
               >
                 <div class="flex items-center justify-between border-b border-hris-border px-4 py-3">
                   <p class="text-sm font-semibold">Notifications</p>
@@ -229,18 +234,19 @@ onMounted(loadNotificationSummary)
               </div>
 
               <div
-                class="grid size-9 place-items-center rounded-md bg-hris-primary text-sm font-semibold text-white ring-2 ring-blue-100"
+                class="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-hris-primary to-hris-accent text-sm font-semibold text-white shadow-sm ring-2 ring-blue-100"
               >
                 {{ userInitials }}
               </div>
 
               <button
                 type="button"
-                class="rounded-md border border-hris-border px-3 py-2 text-sm font-medium text-hris-ink hover:bg-hris-surface disabled:cursor-not-allowed disabled:opacity-60"
+                class="inline-flex items-center gap-2 rounded-xl border border-hris-border bg-white px-3 py-2 text-sm font-medium text-hris-ink shadow-sm hover:bg-hris-surface disabled:cursor-not-allowed disabled:opacity-60"
                 :disabled="loggingOut"
                 @click="handleLogout"
               >
-                {{ loggingOut ? 'Signing out...' : 'Logout' }}
+                <BaseIcon name="logout" />
+                <span>{{ loggingOut ? 'Signing out...' : 'Logout' }}</span>
               </button>
             </div>
           </div>
@@ -252,9 +258,10 @@ onMounted(loadNotificationSummary)
                 v-for="item in group.items"
                 :key="item.to"
                 :to="item.to"
-                class="shrink-0 rounded-md border border-hris-border bg-hris-panel px-3 py-2 text-sm font-medium text-hris-muted"
+                class="inline-flex shrink-0 items-center gap-2 rounded-xl border border-hris-border bg-hris-panel px-3 py-2 text-sm font-medium text-hris-muted"
                 active-class="border-hris-primary bg-hris-primary text-white"
               >
+                <BaseIcon :name="item.icon" />
                 {{ item.label }}
               </RouterLink>
             </div>
@@ -262,7 +269,7 @@ onMounted(loadNotificationSummary)
         </div>
       </header>
 
-      <main class="px-4 pb-6 sm:px-5 lg:px-6">
+      <main class="px-4 pb-8 sm:px-5 lg:px-8">
         <RouterView />
       </main>
     </div>
