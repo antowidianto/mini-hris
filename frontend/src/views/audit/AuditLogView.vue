@@ -69,7 +69,7 @@ onMounted(() => loadAuditLogs())
 </script>
 
 <template>
-  <section class="mx-auto max-w-7xl">
+  <section class="mx-auto max-w-screen-2xl">
     <PageHeader eyebrow="System" title="Audit Logs" description="Understand who did what and when across HR operations.">
       <template #actions>
         <div class="rounded-md border border-hris-border bg-hris-surface px-3 py-1.5 text-sm text-hris-muted">

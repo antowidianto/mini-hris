@@ -71,7 +71,7 @@ async function submitSignup() {
 
 <template>
   <main class="min-h-screen bg-slate-950 text-white">
-    <section class="mx-auto grid max-w-7xl gap-10 px-5 py-10 lg:grid-cols-[1.08fr_0.92fr] lg:px-8 lg:py-14">
+    <section class="mx-auto grid max-w-screen-2xl gap-10 px-5 py-10 lg:grid-cols-[1.08fr_0.92fr] lg:px-8 lg:py-14">
       <div>
         <nav class="flex items-center justify-between gap-4">
           <RouterLink to="/welcome" class="flex items-center gap-3">

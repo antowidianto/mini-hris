@@ -144,7 +144,7 @@ onMounted(loadDashboard)
 </script>
 
 <template>
-  <section class="mx-auto max-w-7xl">
+  <section class="mx-auto max-w-screen-2xl">
     <PageHeader
       eyebrow="Workspace"
       title="Dashboard"

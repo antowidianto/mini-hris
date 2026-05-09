@@ -131,7 +131,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="mx-auto max-w-7xl">
+  <section class="mx-auto max-w-screen-2xl">
     <div class="border-b border-hris-border pb-5">
       <p class="text-xs font-semibold uppercase text-hris-accent">Operations</p>
       <h2 class="mt-1 text-2xl font-semibold">Import & Export</h2>
