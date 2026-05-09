@@ -1,6 +1,6 @@
 <script setup>
 import { reactive } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/authStore'
 
@@ -35,7 +35,7 @@ async function submitLogin() {
       @submit.prevent="submitLogin"
     >
       <h1 class="text-xl font-semibold">Mini HRIS</h1>
-      <p class="mt-2 text-sm text-hris-muted">Sign in to your workspace</p>
+      <p class="mt-2 text-sm text-hris-muted">Sign in to your SaaS workspace</p>
 
       <div class="mt-6 space-y-4">
         <label class="block">
@@ -73,6 +73,11 @@ async function submitLogin() {
         >
           {{ auth.loading ? 'Signing in...' : 'Login' }}
         </button>
+
+        <p class="text-center text-xs text-hris-muted">
+          Need a tenant workspace?
+          <RouterLink to="/welcome" class="font-semibold text-hris-primary hover:underline">Start a trial</RouterLink>
+        </p>
       </div>
     </form>
   </main>
