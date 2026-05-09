@@ -3,6 +3,7 @@
 namespace Tests\Feature\AuditLogs;
 
 use App\Models\AuditLog;
+use App\Models\Company;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
@@ -75,7 +76,47 @@ class AuditLogTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.audit_logs.0.module', AuditLog::MODULE_EMPLOYEE)
             ->assertJsonPath('data.audit_logs.0.action', AuditLog::ACTION_CREATED)
-            ->assertJsonPath('data.audit_logs.0.user.email', $admin->email);
+            ->assertJsonPath('data.audit_logs.0.user.email', $admin->email)
+            ->assertJsonPath('data.audit_logs.0.module_label', 'Employees')
+            ->assertJsonPath('data.audit_logs.0.action_label', 'Created')
+            ->assertJsonPath('data.filters.modules.0.value', AuditLog::MODULE_AUTH);
+    }
+
+    public function test_admin_can_filter_audit_logs_by_company_user_and_search(): void
+    {
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $hr = User::factory()->create([
+            'company_id' => $admin->company_id,
+            'role' => User::ROLE_HR,
+            'name' => 'Audit HR',
+            'email' => 'audit-hr@example.com',
+        ]);
+        $otherCompanyUser = User::factory()->for(Company::factory())->create(['role' => User::ROLE_ADMIN]);
+
+        AuditLog::factory()->for($admin->company)->for($hr, 'user')->create([
+            'action' => AuditLog::ACTION_UPDATED,
+            'module' => AuditLog::MODULE_SETTINGS,
+            'description' => 'Updated approval flow configuration.',
+            'created_at' => '2026-05-08 10:00:00',
+        ]);
+        AuditLog::factory()->for($otherCompanyUser->company)->for($otherCompanyUser, 'user')->create([
+            'action' => AuditLog::ACTION_DELETED,
+            'module' => AuditLog::MODULE_DOCUMENT,
+            'description' => 'Deleted outside company document.',
+            'created_at' => '2026-05-08 11:00:00',
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $this->getJson('/api/audit-logs?user_id='.$hr->id.'&search=approval&date_from=2026-05-08&date_to=2026-05-08')
+            ->assertOk()
+            ->assertJsonCount(1, 'data.audit_logs')
+            ->assertJsonPath('data.audit_logs.0.user.email', $hr->email)
+            ->assertJsonPath('data.audit_logs.0.summary', 'Audit HR Updated Settings')
+            ->assertJsonPath('data.filters.users.0.email', $hr->email);
+
+        $this->getJson('/api/audit-logs?user_id='.$otherCompanyUser->id)
+            ->assertUnprocessable();
     }
 
     public function test_employee_leave_and_payroll_events_are_logged(): void
