@@ -22,6 +22,7 @@ class AuditLogController extends Controller
             'audit_logs' => $payload['data'],
             'links' => $payload['links'],
             'meta' => $payload['meta'],
+            'filters' => $this->auditLogService->filterOptions($request->user()),
         ]);
     }
 }

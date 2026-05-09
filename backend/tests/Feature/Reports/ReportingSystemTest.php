@@ -123,6 +123,25 @@ class ReportingSystemTest extends TestCase
             ->assertJsonValidationErrors(['branch_id', 'department_id'], 'errors');
     }
 
+    public function test_operational_report_date_range_is_limited(): void
+    {
+        Sanctum::actingAs(User::factory()->create(['role' => User::ROLE_HR]));
+
+        $this->getJson('/api/reports/operational?date_from=2025-01-01&date_to=2026-12-31')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['date_to'], 'errors');
+    }
+
+    public function test_operational_report_date_range_uses_default_end_date_for_limit(): void
+    {
+        $this->travelTo('2026-05-09 10:00:00');
+        Sanctum::actingAs(User::factory()->create(['role' => User::ROLE_HR]));
+
+        $this->getJson('/api/reports/operational?date_from=2025-01-01')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['date_to'], 'errors');
+    }
+
     public function test_employee_cannot_view_operational_reports(): void
     {
         Sanctum::actingAs(User::factory()->create(['role' => User::ROLE_EMPLOYEE]));

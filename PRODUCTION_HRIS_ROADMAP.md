@@ -40,8 +40,8 @@ Objective:
 - [x] 6. Flexible Approval Workflow
 - [x] 7. Reporting System
 - [x] 8. Corporate UI Improvement
-- [ ] 9. Audit Log Improvement
-- [ ] 10. Performance Optimization
+- [x] 9. Audit Log Improvement
+- [x] 10. Performance Optimization
 
 ## Module Notes
 

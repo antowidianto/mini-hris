@@ -28,9 +28,9 @@ class ReportingService
             ->get();
 
         $employeeIds = $employees->pluck('id');
+        $employeesById = $employees->keyBy('id');
 
         $attendances = Attendance::query()
-            ->with(['employee.branch', 'employee.department', 'employee.position'])
             ->where('company_id', $companyId)
             ->whereIn('employee_id', $employeeIds)
             ->whereBetween('attendance_date', [$dateFrom, $dateTo])
@@ -38,7 +38,7 @@ class ReportingService
             ->get();
 
         $leaveRequests = LeaveRequest::query()
-            ->with(['employee.branch', 'employee.department', 'leaveType'])
+            ->with('leaveType')
             ->where('company_id', $companyId)
             ->whereIn('employee_id', $employeeIds)
             ->where('start_date', '<=', $dateTo)
@@ -56,9 +56,9 @@ class ReportingService
             ],
             'summary' => $this->summary($employees, $attendances, $leaveRequests, $dateFrom, $dateTo),
             'attendance_recap' => $this->attendanceRecap($employees, $attendances),
-            'late_report' => $this->lateReport($attendances),
-            'overtime_report' => $this->overtimeReport($attendances),
-            'leave_report' => $this->leaveReport($leaveRequests, $dateFrom, $dateTo),
+            'late_report' => $this->lateReport($attendances, $employeesById),
+            'overtime_report' => $this->overtimeReport($attendances, $employeesById),
+            'leave_report' => $this->leaveReport($leaveRequests, $employeesById, $dateFrom, $dateTo),
             'headcount_by_branch' => $this->headcountByBranch($employees),
         ];
     }
@@ -139,7 +139,7 @@ class ReportingService
     /**
      * @return list<array<string, mixed>>
      */
-    private function lateReport($attendances): array
+    private function lateReport($attendances, $employeesById): array
     {
         return $attendances
             ->where('status', Attendance::STATUS_LATE)
@@ -147,7 +147,7 @@ class ReportingService
             ->take(100)
             ->map(fn (Attendance $attendance) => [
                 'id' => $attendance->id,
-                'employee' => $this->employeePayload($attendance->employee),
+                'employee' => $this->employeePayload($employeesById->get($attendance->employee_id)),
                 'attendance_date' => $attendance->attendance_date?->format('Y-m-d'),
                 'time_in' => $attendance->time_in,
                 'shift_start' => $attendance->shift_start,
@@ -161,7 +161,7 @@ class ReportingService
     /**
      * @return list<array<string, mixed>>
      */
-    private function overtimeReport($attendances): array
+    private function overtimeReport($attendances, $employeesById): array
     {
         return $attendances
             ->where('overtime_minutes', '>', 0)
@@ -169,7 +169,7 @@ class ReportingService
             ->take(100)
             ->map(fn (Attendance $attendance) => [
                 'id' => $attendance->id,
-                'employee' => $this->employeePayload($attendance->employee),
+                'employee' => $this->employeePayload($employeesById->get($attendance->employee_id)),
                 'attendance_date' => $attendance->attendance_date?->format('Y-m-d'),
                 'time_out' => $attendance->time_out,
                 'shift_end' => $attendance->shift_end,
@@ -183,7 +183,7 @@ class ReportingService
     /**
      * @return array<string, mixed>
      */
-    private function leaveReport($leaveRequests, string $dateFrom, string $dateTo): array
+    private function leaveReport($leaveRequests, $employeesById, string $dateFrom, string $dateTo): array
     {
         return [
             'summary_by_type' => $leaveRequests
@@ -210,16 +210,18 @@ class ReportingService
                 ->all(),
             'requests' => $leaveRequests
                 ->take(100)
-                ->map(fn (LeaveRequest $leaveRequest) => [
-                    'id' => $leaveRequest->id,
-                    'employee' => $this->employeePayload($leaveRequest->employee),
-                    'leave_type' => $leaveRequest->leaveType?->name,
-                    'start_date' => $leaveRequest->start_date?->format('Y-m-d'),
-                    'end_date' => $leaveRequest->end_date?->format('Y-m-d'),
-                    'total_days' => $leaveRequest->total_days,
-                    'report_days' => $this->overlapDays($leaveRequest, $dateFrom, $dateTo),
-                    'status' => $leaveRequest->status,
-                ])
+                ->map(function (LeaveRequest $leaveRequest) use ($employeesById, $dateFrom, $dateTo) {
+                    return [
+                        'id' => $leaveRequest->id,
+                        'employee' => $this->employeePayload($employeesById->get($leaveRequest->employee_id)),
+                        'leave_type' => $leaveRequest->leaveType?->name,
+                        'start_date' => $leaveRequest->start_date?->format('Y-m-d'),
+                        'end_date' => $leaveRequest->end_date?->format('Y-m-d'),
+                        'total_days' => $leaveRequest->total_days,
+                        'report_days' => $this->overlapDays($leaveRequest, $dateFrom, $dateTo),
+                        'status' => $leaveRequest->status,
+                    ];
+                })
                 ->values()
                 ->all(),
         ];

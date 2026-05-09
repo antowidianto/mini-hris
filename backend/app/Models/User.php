@@ -83,6 +83,11 @@ class User extends Authenticatable
         return $this->hasMany(Notification::class);
     }
 
+    public function auditLogs(): HasMany
+    {
+        return $this->hasMany(AuditLog::class);
+    }
+
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
