@@ -33,6 +33,7 @@ const adminMetricTiles = computed(() => [
     detail: `${metrics.value.active_employees ?? 0} active`,
     tone: 'blue',
     to: '/employees',
+    icon: 'people',
   },
   {
     label: 'Attendance Today',
@@ -40,6 +41,7 @@ const adminMetricTiles = computed(() => [
     detail: `${attendanceToday.value.not_recorded ?? 0} not recorded`,
     tone: 'green',
     to: '/attendance/report',
+    icon: 'clock',
   },
   {
     label: 'Approval Queue',
@@ -47,6 +49,7 @@ const adminMetricTiles = computed(() => [
     detail: `${metrics.value.pending_supervisor_approvals ?? 0} supervisor / ${metrics.value.pending_hr_approvals ?? 0} HR`,
     tone: 'amber',
     to: '/leaves/approvals',
+    icon: 'check-circle',
   },
   {
     label: 'Contracts 60 Days',
@@ -54,18 +57,19 @@ const adminMetricTiles = computed(() => [
     detail: `${metrics.value.contracts_expiring_30_days ?? 0} due in 30 days`,
     tone: 'red',
     to: '/contracts',
+    icon: 'briefcase',
   },
 ])
 
 const attendanceTiles = computed(() => [
-  { label: 'Recorded', value: attendanceToday.value.recorded ?? 0, detail: `${attendanceToday.value.active_employees ?? 0} active`, tone: 'blue' },
-  { label: 'Present', value: attendanceToday.value.present ?? 0, tone: 'green' },
-  { label: 'Late', value: attendanceToday.value.late ?? 0, tone: 'amber' },
-  { label: 'Leave', value: attendanceToday.value.leave ?? 0, tone: 'blue' },
-  { label: 'Sick', value: attendanceToday.value.sick ?? 0, tone: 'violet' },
-  { label: 'Permission', value: attendanceToday.value.permission ?? 0, tone: 'blue' },
-  { label: 'Alpha', value: attendanceToday.value.alpha ?? 0, tone: 'red' },
-  { label: 'Not Recorded', value: attendanceToday.value.not_recorded ?? 0, tone: 'slate' },
+  { label: 'Recorded', value: attendanceToday.value.recorded ?? 0, detail: `${attendanceToday.value.active_employees ?? 0} active`, tone: 'blue', icon: 'clock' },
+  { label: 'Present', value: attendanceToday.value.present ?? 0, tone: 'green', icon: 'check-circle' },
+  { label: 'Late', value: attendanceToday.value.late ?? 0, tone: 'amber', icon: 'clock' },
+  { label: 'Leave', value: attendanceToday.value.leave ?? 0, tone: 'blue', icon: 'calendar' },
+  { label: 'Sick', value: attendanceToday.value.sick ?? 0, tone: 'violet', icon: 'document' },
+  { label: 'Permission', value: attendanceToday.value.permission ?? 0, tone: 'blue', icon: 'document' },
+  { label: 'Alpha', value: attendanceToday.value.alpha ?? 0, tone: 'red', icon: 'bell' },
+  { label: 'Not Recorded', value: attendanceToday.value.not_recorded ?? 0, tone: 'slate', icon: 'clock' },
 ])
 
 const employeeMetricTiles = computed(() => [
@@ -75,6 +79,7 @@ const employeeMetricTiles = computed(() => [
     detail: `${metrics.value.attendance_today?.time_in ?? '--'} to ${metrics.value.attendance_today?.time_out ?? '--'}`,
     tone: metrics.value.attendance_today ? 'green' : 'amber',
     to: '/attendance',
+    icon: 'clock',
   },
   {
     label: 'Remaining Leave',
@@ -82,6 +87,7 @@ const employeeMetricTiles = computed(() => [
     detail: 'Current year balance',
     tone: 'blue',
     to: '/leaves',
+    icon: 'calendar',
   },
   {
     label: 'Latest Leave',
@@ -89,6 +95,7 @@ const employeeMetricTiles = computed(() => [
     detail: metrics.value.latest_leave_request?.leave_type?.name ?? 'No request yet',
     tone: metrics.value.latest_leave_request?.status === 'rejected' ? 'red' : 'amber',
     to: '/leaves',
+    icon: 'calendar',
   },
   {
     label: 'Latest Payslip',
@@ -96,6 +103,7 @@ const employeeMetricTiles = computed(() => [
     detail: metrics.value.latest_payslip?.period_label ?? 'No payslip yet',
     tone: 'green',
     to: '/payslips',
+    icon: 'wallet',
   },
 ])
 
@@ -140,6 +148,7 @@ onMounted(loadDashboard)
     <PageHeader
       eyebrow="Workspace"
       title="Dashboard"
+      icon="dashboard"
       :description="`Welcome back, ${auth.user?.name ?? 'team'}. Workforce operations overview.`"
     >
       <template #actions>
@@ -177,6 +186,7 @@ onMounted(loadDashboard)
             :detail="tile.detail"
             :tone="tile.tone"
             :to="tile.to"
+            :icon="tile.icon"
           />
         </div>
       </section>
@@ -194,6 +204,7 @@ onMounted(loadDashboard)
             :value="tile.value"
             :detail="tile.detail"
             :tone="tile.tone"
+            :icon="tile.icon"
           />
         </div>
       </section>
@@ -272,10 +283,10 @@ onMounted(loadDashboard)
           <h3 class="text-sm font-semibold text-hris-ink">Quick Actions</h3>
         </div>
         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <MetricTile label="Add Employee" value="New" detail="Create employee profile" tone="blue" to="/employees/new" />
-          <MetricTile label="Review Leave" :value="metrics.pending_leave_requests ?? 0" detail="Pending decisions" tone="amber" to="/leaves/approvals" />
-          <MetricTile label="Generate Payroll" :value="payrollReadiness.missing_count ?? 0" detail="Missing payroll rows" tone="green" to="/payroll" />
-          <MetricTile label="Operational Reports" value="Open" detail="Attendance, leave, payroll" tone="violet" to="/reports" />
+          <MetricTile label="Add Employee" value="New" detail="Create employee profile" tone="blue" to="/employees/new" icon="people" />
+          <MetricTile label="Review Leave" :value="metrics.pending_leave_requests ?? 0" detail="Pending decisions" tone="amber" to="/leaves/approvals" icon="check-circle" />
+          <MetricTile label="Generate Payroll" :value="payrollReadiness.missing_count ?? 0" detail="Missing payroll rows" tone="green" to="/payroll" icon="wallet" />
+          <MetricTile label="Operational Reports" value="Open" detail="Attendance, leave, payroll" tone="violet" to="/reports" icon="chart" />
         </div>
       </section>
     </div>
@@ -302,6 +313,7 @@ onMounted(loadDashboard)
             :detail="tile.detail"
             :tone="tile.tone"
             :to="tile.to"
+            :icon="tile.icon"
           />
           <MetricTile
             v-if="metrics.pending_supervisor_approvals > 0"
@@ -310,6 +322,7 @@ onMounted(loadDashboard)
             detail="Waiting for your approval"
             tone="amber"
             to="/leaves/approvals"
+            icon="check-circle"
           />
         </div>
       </section>
@@ -319,9 +332,9 @@ onMounted(loadDashboard)
           <h3 class="text-sm font-semibold text-hris-ink">Quick Actions</h3>
         </div>
         <div class="grid gap-3 lg:grid-cols-3">
-          <MetricTile label="Record Attendance" value="Clock" detail="Clock in or clock out" tone="green" to="/attendance" />
-          <MetricTile label="Request Leave" value="Submit" detail="Create and track requests" tone="blue" to="/leaves" />
-          <MetricTile label="View Payslips" value="Open" detail="Latest salary records" tone="violet" to="/payslips" />
+          <MetricTile label="Record Attendance" value="Clock" detail="Clock in or clock out" tone="green" to="/attendance" icon="clock" />
+          <MetricTile label="Request Leave" value="Submit" detail="Create and track requests" tone="blue" to="/leaves" icon="calendar" />
+          <MetricTile label="View Payslips" value="Open" detail="Latest salary records" tone="violet" to="/payslips" icon="wallet" />
         </div>
       </section>
     </div>
