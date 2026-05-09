@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Requests\Auth\RegisterTenantRequest;
 use App\Http\Resources\AuthUserResource;
 use App\Models\AuditLog;
 use App\Models\User;
 use App\Services\AuditLogService;
+use App\Services\TenantOnboardingService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,7 +18,32 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
-    public function __construct(private readonly AuditLogService $auditLogService) {}
+    public function __construct(
+        private readonly AuditLogService $auditLogService,
+        private readonly TenantOnboardingService $tenantOnboardingService,
+    ) {}
+
+    public function register(RegisterTenantRequest $request): JsonResponse
+    {
+        $result = $this->tenantOnboardingService->register($request->validated());
+        /** @var User $user */
+        $user = $result['user'];
+        $token = $user->createToken('mini-hris-spa')->plainTextToken;
+
+        $this->auditLogService->record(
+            $user,
+            AuditLog::ACTION_CREATED,
+            AuditLog::MODULE_AUTH,
+            "Tenant workspace {$user->company?->name} was registered.",
+            $request
+        );
+
+        return ApiResponse::success('Workspace registered successfully', [
+            'token' => $token,
+            'token_type' => 'Bearer',
+            'user' => new AuthUserResource($user),
+        ], 201);
+    }
 
     public function login(LoginRequest $request): JsonResponse
     {
@@ -27,6 +54,10 @@ class AuthController extends Controller
 
         if (! $user || ! Hash::check($credentials['password'], $user->password)) {
             return ApiResponse::error('Invalid email or password', null, 422);
+        }
+
+        if (! $user->company?->hasActiveSubscription()) {
+            return ApiResponse::error('Your workspace subscription is inactive. Please update billing to continue.', null, 402);
         }
 
         $token = $user->createToken('mini-hris-spa')->plainTextToken;

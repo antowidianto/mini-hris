@@ -22,6 +22,15 @@ class AuthUserResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             'role' => $this->role,
+            'company' => $this->company ? [
+                'id' => $this->company->id,
+                'name' => $this->company->name,
+                'code' => $this->company->code,
+                'plan' => $this->company->plan,
+                'subscription_status' => $this->company->subscription_status,
+                'trial_ends_at' => $this->company->trial_ends_at?->toDateString(),
+                'employee_limit' => $this->company->employee_limit,
+            ] : null,
             'employee' => $employee ? [
                 'id' => $employee->id,
                 'employee_id' => $employee->employee_id,

@@ -22,10 +22,27 @@ import NotFoundView from '@/views/NotFoundView.vue'
 import NotificationListView from '@/views/notifications/NotificationListView.vue'
 import PayrollDetailView from '@/views/payroll/PayrollDetailView.vue'
 import PayrollListView from '@/views/payroll/PayrollListView.vue'
+import SaasLandingView from '@/views/SaasLandingView.vue'
 import PayslipListView from '@/views/payroll/PayslipListView.vue'
 import OperationalReportsView from '@/views/reports/OperationalReportsView.vue'
 
 const routes = [
+  {
+    path: '/welcome',
+    name: 'welcome',
+    component: SaasLandingView,
+    meta: {
+      public: true,
+    },
+  },
+  {
+    path: '/signup',
+    name: 'signup',
+    component: SaasLandingView,
+    meta: {
+      public: true,
+    },
+  },
   {
     path: '/login',
     name: 'login',

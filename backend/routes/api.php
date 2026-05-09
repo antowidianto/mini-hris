@@ -31,14 +31,15 @@ Route::get('/health', function () {
 
 Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+    Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:3,1');
 
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'tenant.active'])->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
     });
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'tenant.active'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'show']);
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
@@ -50,7 +51,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/leaves/{leaveRequest}/supervisor-reject', [LeaveController::class, 'supervisorReject']);
 });
 
-Route::middleware(['auth:sanctum', 'role:admin,hr'])->group(function () {
+Route::middleware(['auth:sanctum', 'tenant.active', 'role:admin,hr'])->group(function () {
     Route::get('/departments', [DepartmentController::class, 'index']);
     Route::get('/positions', [PositionController::class, 'index']);
     Route::get('/branches', [BranchController::class, 'index']);
@@ -83,7 +84,7 @@ Route::middleware(['auth:sanctum', 'role:admin,hr'])->group(function () {
     Route::get('/payroll/{payroll}', [PayrollController::class, 'show']);
 });
 
-Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
+Route::middleware(['auth:sanctum', 'tenant.active', 'role:admin'])->group(function () {
     Route::get('/audit-logs', [AuditLogController::class, 'index']);
     Route::get('/company-settings', [CompanySettingController::class, 'show']);
     Route::put('/company-settings', [CompanySettingController::class, 'update']);
@@ -95,24 +96,24 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::put('/approval-flows', [ApprovalFlowController::class, 'replace']);
 });
 
-Route::middleware(['auth:sanctum', 'role:employee'])->prefix('attendance')->group(function () {
+Route::middleware(['auth:sanctum', 'tenant.active', 'role:employee'])->prefix('attendance')->group(function () {
     Route::post('/clock-in', [AttendanceController::class, 'clockIn']);
     Route::post('/clock-out', [AttendanceController::class, 'clockOut']);
     Route::get('/my', [AttendanceController::class, 'my']);
 });
 
-Route::middleware(['auth:sanctum', 'role:employee'])->prefix('leaves')->group(function () {
+Route::middleware(['auth:sanctum', 'tenant.active', 'role:employee'])->prefix('leaves')->group(function () {
     Route::get('/balances', [LeaveController::class, 'balances']);
     Route::get('/', [LeaveController::class, 'index']);
     Route::post('/', [LeaveController::class, 'store']);
 });
 
-Route::middleware(['auth:sanctum', 'role:employee'])->prefix('payslips')->group(function () {
+Route::middleware(['auth:sanctum', 'tenant.active', 'role:employee'])->prefix('payslips')->group(function () {
     Route::get('/', [PayrollController::class, 'payslips']);
     Route::get('/{payroll}', [PayrollController::class, 'payslip']);
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'tenant.active'])->group(function () {
     Route::get('/documents/my', [DocumentController::class, 'mine']);
     Route::get('/documents/{document}/preview', [DocumentController::class, 'preview']);
     Route::get('/documents/{document}/download', [DocumentController::class, 'download']);

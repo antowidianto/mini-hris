@@ -54,6 +54,31 @@ export const useAuthStore = defineStore('auth', {
       storage().removeItem(TOKEN_KEY)
       storage().removeItem(USER_KEY)
     },
+    async register(payload) {
+      if (this.loading) {
+        return null
+      }
+
+      this.loading = true
+      this.error = null
+
+      try {
+        const response = await api.post('/auth/register', payload)
+        const data = response.data.data
+
+        this.setSession({
+          token: data.token,
+          user: data.user,
+        })
+
+        return data.user
+      } catch (error) {
+        this.error = error.response?.data?.message ?? 'Unable to create workspace'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
     async login(credentials) {
       if (this.loading) {
         return null
