@@ -141,7 +141,7 @@ onMounted(loadContracts)
 </script>
 
 <template>
-  <section class="mx-auto max-w-7xl">
+  <section class="mx-auto max-w-screen-2xl">
     <div class="flex flex-col justify-between gap-4 border-b border-hris-border pb-5 sm:flex-row">
       <div>
         <p class="text-xs font-semibold uppercase text-hris-accent">People</p>

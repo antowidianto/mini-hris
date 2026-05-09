@@ -85,7 +85,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="mx-auto max-w-7xl">
+  <section class="mx-auto max-w-screen-2xl">
     <PageHeader eyebrow="Reports" title="Operational Reports" description="Review attendance, leave, overtime, and headcount across the company." />
 
     <div v-if="error" class="mt-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

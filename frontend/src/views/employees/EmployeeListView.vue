@@ -2,6 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
+import BaseModal from '@/components/BaseModal.vue'
 import ConfirmationModal from '@/components/ConfirmationModal.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingState from '@/components/LoadingState.vue'
@@ -36,6 +37,7 @@ const loading = ref(false)
 const error = ref(null)
 const deactivating = ref(false)
 const selectedEmployee = ref(null)
+const detailEmployee = ref(null)
 
 function currency(value) {
   return new Intl.NumberFormat('id-ID', {
@@ -123,7 +125,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="mx-auto max-w-7xl">
+  <section class="mx-auto max-w-screen-2xl">
     <PageHeader title="Employees" description="Manage employee profiles and account links.">
       <template #actions>
         <RouterLink
@@ -247,8 +249,11 @@ onMounted(async () => {
               <td class="px-4 py-3">{{ currency(employee.basic_salary) }}</td>
               <td class="px-4 py-3">
                 <div class="flex gap-2">
+                  <button type="button" class="text-hris-primary hover:underline" @click="detailEmployee = employee">
+                    Detail
+                  </button>
                   <RouterLink class="text-hris-primary hover:underline" :to="`/employees/${employee.id}`">
-                    View
+                    Full Page
                   </RouterLink>
                   <RouterLink class="text-hris-primary hover:underline" :to="`/employees/${employee.id}/edit`">
                     Edit
@@ -270,6 +275,49 @@ onMounted(async () => {
     </div>
 
     <PaginationControls :meta="meta" @change="loadEmployees" />
+
+
+    <BaseModal
+      :open="Boolean(detailEmployee)"
+      title="Employee details"
+      :description="detailEmployee?.full_name"
+      size="2xl"
+      @close="detailEmployee = null"
+    >
+      <div v-if="detailEmployee" class="grid gap-4 md:grid-cols-3">
+        <div class="rounded-xl border border-hris-border p-4">
+          <p class="text-xs font-semibold uppercase text-hris-muted">Identity</p>
+          <p class="mt-2 font-semibold">{{ detailEmployee.full_name }}</p>
+          <p class="text-sm text-hris-muted">{{ detailEmployee.employee_id }} · {{ detailEmployee.email }}</p>
+        </div>
+        <div class="rounded-xl border border-hris-border p-4">
+          <p class="text-xs font-semibold uppercase text-hris-muted">Organization</p>
+          <p class="mt-2 font-semibold">{{ detailEmployee.department?.name ?? '-' }}</p>
+          <p class="text-sm text-hris-muted">{{ detailEmployee.position?.name ?? '-' }} · {{ detailEmployee.branch?.name ?? '-' }}</p>
+        </div>
+        <div class="rounded-xl border border-hris-border p-4">
+          <p class="text-xs font-semibold uppercase text-hris-muted">Employment</p>
+          <p class="mt-2 font-semibold">{{ employmentTypeLabel(detailEmployee.employment_type) }}</p>
+          <StatusBadge class="mt-2" :status="detailEmployee.employment_status" />
+        </div>
+        <div class="rounded-xl border border-hris-border p-4 md:col-span-3">
+          <p class="text-xs font-semibold uppercase text-hris-muted">Compensation</p>
+          <p class="mt-2 text-sm">Basic salary: <span class="font-semibold">{{ currency(detailEmployee.basic_salary) }}</span></p>
+        </div>
+      </div>
+      <template #footer>
+        <button type="button" class="rounded-md border border-hris-border px-4 py-2 text-sm font-medium hover:bg-hris-surface" @click="detailEmployee = null">
+          Close
+        </button>
+        <RouterLink
+          v-if="detailEmployee"
+          class="rounded-md bg-hris-primary px-4 py-2 text-sm font-semibold text-white hover:bg-hris-primary-dark"
+          :to="`/employees/${detailEmployee.id}/edit`"
+        >
+          Edit Employee
+        </RouterLink>
+      </template>
+    </BaseModal>
 
     <ConfirmationModal
       :open="Boolean(selectedEmployee)"
